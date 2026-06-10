@@ -1,19 +1,20 @@
-import React, { useMemo, useState } from "react";
+import { BankOutlined, TeamOutlined, TrophyOutlined } from "@ant-design/icons";
 import {
-  Table,
-  Select,
-  Input,
-  Button,
-  Row,
-  Col,
-  Card,
-  Space,
-  Image,
-  Tag,
   Avatar,
+  Button,
+  Card,
+  Col,
+  Image,
+  Input,
+  Row,
+  Select,
+  Space,
   Statistic,
+  Table,
+  Tag,
 } from "antd";
-import { TeamOutlined, BankOutlined, TrophyOutlined } from "@ant-design/icons";
+import axios from "axios";
+import { useEffect, useMemo, useState } from "react";
 
 const { Search } = Input;
 
@@ -21,38 +22,21 @@ export default function StudentReportPage() {
   const [selectedSchool, setSelectedSchool] = useState();
   const [keyword, setKeyword] = useState("");
 
-  const [listStudent] = useState([
-    {
-      student_id: 8297526,
-      student_name: "LÊ HOÀNG ANH",
-      class_name: "Monkey 1 (2-3 tuổi)",
-      class_id: 2135,
-      school_id: 1,
-      school_name: "Monkey School Hà Nội",
-      report_name: "Level 0 Unit 5",
-      game_lesson_id: 1526275,
-      test_result: "Very good",
-      image:
-        "https://vnmedia2.monkeyuni.net/App/uploads/kindy/image/6a142735677b7.png",
-      video:
-        "https://vnmedia2.monkeyuni.net//processed/1778291194_1778291194_le_hoang_anh_720p.mp4",
-    },
-    {
-      student_id: 8297527,
-      student_name: "NGUYỄN VĂN A",
-      class_name: "Monkey 2",
-      class_id: 2136,
-      school_id: 2,
-      school_name: "Monkey School HCM",
-      report_name: "Level 1 Unit 2",
-      game_lesson_id: 1526276,
-      test_result: "Good",
-      image:
-        "https://vnmedia2.monkeyuni.net/App/uploads/kindy/image/6a142735677b7.png",
-      video:
-        "https://vnmedia2.monkeyuni.net//processed/1778291194_1778291194_le_hoang_anh_720p.mp4",
-    },
-  ]);
+  const [listStudent, setListStudent] = useState([]);
+
+  const getStatusList = async () => {
+    try {
+      const res = await axios.get("http://localhost:3000/api/status-list");
+      setListStudent(res.data.data.data);
+      console.log(res.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    getStatusList();
+  }, []);
 
   const highlightText = (text, keyword) => {
     if (!keyword) return text;
