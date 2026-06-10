@@ -1,7 +1,7 @@
 const axios = require("axios");
 const sharp = require("sharp");
 const Tesseract = require("tesseract.js");
-const pLimit = require("p-limit");
+const pLimit = require("p-limit").default;
 
 const limit = pLimit(3);
 
