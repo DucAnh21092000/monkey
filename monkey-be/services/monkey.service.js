@@ -96,7 +96,7 @@ async function getStatusList() {
     },
   });
 
-  const records = data.data || [];
+  const records = data.data.data || [];
 
   const enrichedData = await Promise.all(
     records.map((item) =>
