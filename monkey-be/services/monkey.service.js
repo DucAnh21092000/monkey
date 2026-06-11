@@ -15,6 +15,8 @@ const api = axios.create({
   },
 });
 
+
+
 const OCR_CACHE = new Map();
 
 /**
@@ -60,7 +62,7 @@ async function extractTestResult(imageUrl) {
     const {
       data: { text },
     } = await Tesseract.recognize(cropBuffer, "eng", {
-      logger: () => {},
+      logger: () => { },
     });
 
     const lower = text.toLowerCase();
@@ -87,10 +89,11 @@ async function extractTestResult(imageUrl) {
   }
 }
 
-async function getStatusList() {
+async function getStatusList(school_id) {
+  console.log(school_id);
   const { data } = await api.get("/student-evaluation/status-list", {
     params: {
-      school_id: 540,
+      school_id: school_id,
       page: 1,
       limit: 100,
     },
@@ -99,13 +102,14 @@ async function getStatusList() {
   const records = data.data.data || [];
 
   const enrichedData = await Promise.all(
-    records.map((item) =>
+    records.map((item, index) =>
       limit(async () => {
         const testResult = await extractTestResult(item.image);
 
         return {
           ...item,
           test_result: testResult,
+          stt: index + 1,
         };
       }),
     ),
@@ -127,7 +131,16 @@ async function getFilters() {
   return data;
 }
 
+const getSchools = async () => {
+  const { data } = await api.get("https://web.monkeyenglish.net/classroom_go/api/v2/auth/get-meta-info");
+
+  // sửa lại field theo response thực tế
+  return data?.data?.schools || [];
+};
+
+
 module.exports = {
   getStatusList,
   getFilters,
+  getSchools
 };
