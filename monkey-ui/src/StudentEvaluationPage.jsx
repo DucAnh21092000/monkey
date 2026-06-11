@@ -15,25 +15,16 @@ import {
 } from "antd";
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-} from "chart.js";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 
-ChartJS.register(
-  ArcElement,
-  Tooltip,
-  Legend
-);
+ChartJS.register(ArcElement, Tooltip, Legend);
 const { Search } = Input;
 
 export default function StudentReportPage() {
   const [selectedSchool, setSelectedSchool] = useState();
   const [keyword, setKeyword] = useState("");
-  const [listSchool, setListSchool] = useState([])
+  const [listSchool, setListSchool] = useState([]);
   const [listStudent, setListStudent] = useState([]);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -55,7 +46,7 @@ export default function StudentReportPage() {
               page,
               pageSize,
             },
-          }
+          },
         );
 
         setListStudent(response.data?.data ?? []);
@@ -71,7 +62,7 @@ export default function StudentReportPage() {
         setLoading(false);
       }
     },
-    []
+    [],
   );
 
   const chartData = useMemo(() => {
@@ -203,6 +194,17 @@ export default function StudentReportPage() {
     [listStudent],
   );
 
+  const reportFilters = useMemo(
+    () =>
+      [
+        ...new Set(listStudent.map((item) => item.report_name).filter(Boolean)),
+      ].map((value) => ({
+        text: value,
+        value,
+      })),
+    [listStudent],
+  );
+
   const schoolFilters = useMemo(
     () =>
       [
@@ -231,7 +233,9 @@ export default function StudentReportPage() {
       dataIndex: "stt",
       width: 70,
       fixed: "left",
-      render: (value, record, index) => <span style={{ fontWeight: 600 }}>{index + 1}</span>,
+      render: (value, record, index) => (
+        <span style={{ fontWeight: 600 }}>{index + 1}</span>
+      ),
     },
     {
       title: "",
@@ -271,6 +275,9 @@ export default function StudentReportPage() {
     {
       title: "Report",
       dataIndex: "report_name",
+      filters: reportFilters,
+      filterSearch: true,
+      onFilter: (value, record) => record.report_name === value,
     },
     {
       title: "Test Result",
@@ -320,7 +327,7 @@ export default function StudentReportPage() {
     fetchStudents(
       selectedSchool,
       paginationConfig.current,
-      paginationConfig.pageSize
+      paginationConfig.pageSize,
     );
   };
 
