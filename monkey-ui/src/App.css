@@ -1,0 +1,358 @@
+:root {
+  font-family: Inter, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #0f172a;
+  background: linear-gradient(135deg, #fdf2f8 0%, #eef6ff 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #fdf2f8 0%, #eef6ff 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.student-page-shell {
+  padding: 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.page-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding: 28px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #ffffff 0%, #f7faff 100%);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+}
+
+.hero-eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+
+.page-hero h1 {
+  margin: 0 0 10px;
+  font-size: 1.9rem;
+  color: #111827;
+}
+
+.page-hero p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.hero-copyright {
+  margin: 0 0 8px !important;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8b5cf6;
+}
+
+.hero-badge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hero-badge span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #4338ca;
+  font-weight: 600;
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.14);
+}
+
+.stat-card {
+  min-height: 160px;
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.stat-card .ant-statistic-title,
+.stat-card .ant-statistic-content,
+.stat-card .ant-statistic-content-value {
+  color: #0f172a !important;
+}
+
+.stat-card .ant-statistic-title {
+  color: #475569 !important;
+}
+
+.stat-card .ant-statistic-content-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-card .ant-statistic-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-card .ant-statistic-content-prefix {
+  font-size: 18px;
+}
+
+.stat-card-blue {
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.stat-card-green {
+  background: linear-gradient(135deg, #ecfeff 0%, #ffffff 100%);
+}
+
+.stat-card-purple {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%);
+}
+
+.stat-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  color: #4338ca;
+  font-size: 1.15rem;
+}
+
+.stat-card__text {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.chart-card,
+.info-card,
+.table-card {
+  border: none;
+  border-radius: 22px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+}
+
+.chart-wrapper {
+  height: 280px;
+  width: 280px;
+  margin: 0 auto;
+}
+
+.chart-wrapper-large {
+  width: 100%;
+  max-width: none;
+  height: 320px;
+}
+
+.card-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.filter-toolbar {
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.table-toolbar h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.toolbar-btn-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.toolbar-btn {
+  min-width: 96px;
+  height: 40px;
+  border-radius: 999px !important;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+.toolbar-btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  border: none;
+  color: white;
+}
+
+.toolbar-btn-primary:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%) !important;
+  color: white !important;
+}
+
+.filter-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 2px solid white;
+  box-shadow: 0 4px 10px rgba(239, 68, 68, 0.24);
+}
+
+.filter-grid {
+  margin-bottom: 16px;
+}
+
+.modern-select .ant-select-selector,
+.modern-search .ant-input-affix-wrapper,
+.reset-button,
+.search-action-btn {
+  border-radius: 999px !important;
+  min-height: 44px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+.search-input-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.search-input-wrapper .modern-search {
+  flex: 1;
+}
+
+.search-action-btn {
+  min-width: 110px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #334155;
+  font-weight: 600;
+}
+
+.search-action-btn:hover {
+  color: #4338ca !important;
+  border-color: #c7d2fe !important;
+  background: #f5f3ff !important;
+}
+
+.reset-button {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #334155;
+  font-weight: 600;
+}
+
+.reset-button:hover {
+  color: #4338ca !important;
+  border-color: #c7d2fe !important;
+  background: #f5f3ff !important;
+}
+
+.tips-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #475569;
+  line-height: 1.8;
+}
+
+.table-card .ant-table-wrapper {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.table-card .ant-table-thead > tr > th {
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.student-page-shell .ant-table-row:hover > td {
+  background: #f8fbff !important;
+}
+
+.ant-input-affix-wrapper,
+.ant-select-selector,
+.ant-btn {
+  border-radius: 12px !important;
+}
+
+@media (max-width: 768px) {
+  .student-page-shell {
+    padding: 16px;
+  }
+
+  .page-hero {
+    flex-direction: column;
+  }
+
+  .filter-actions {
+    justify-content: flex-start;
+  }
+
+  .chart-wrapper {
+    width: 240px;
+    height: 240px;
+  }
+}
