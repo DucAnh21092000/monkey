@@ -18,11 +18,41 @@ const api = axios.create({
 
 
 const OCR_CACHE = new Map();
+const IMAGE_BUFFER_CACHE = new Map();
+const CACHE_LIMIT = 200;
+
+function setCacheValue(cache, key, value) {
+  if (cache.size >= CACHE_LIMIT) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey !== undefined) {
+      cache.delete(oldestKey);
+    }
+  }
+
+  cache.set(key, value);
+}
 
 /**
  * Crop vùng "Test result"
  * Layout dựa trên ảnh mẫu cậu gửi
  */
+async function getImageBuffer(imageUrl) {
+  if (IMAGE_BUFFER_CACHE.has(imageUrl)) {
+    return IMAGE_BUFFER_CACHE.get(imageUrl);
+  }
+
+  const response = await axios.get(imageUrl, {
+    responseType: "arraybuffer",
+    timeout: 10000,
+    maxContentLength: 5 * 1024 * 1024,
+  });
+
+  const imageBuffer = Buffer.from(response.data);
+  setCacheValue(IMAGE_BUFFER_CACHE, imageUrl, imageBuffer);
+
+  return imageBuffer;
+}
+
 async function extractTestResult(imageUrl) {
   try {
     if (!imageUrl) return null;
@@ -31,11 +61,7 @@ async function extractTestResult(imageUrl) {
       return OCR_CACHE.get(imageUrl);
     }
 
-    const response = await axios.get(imageUrl, {
-      responseType: "arraybuffer",
-    });
-
-    const imageBuffer = Buffer.from(response.data);
+    const imageBuffer = await getImageBuffer(imageUrl);
 
     const metadata = await sharp(imageBuffer).metadata();
 
@@ -62,6 +88,8 @@ async function extractTestResult(imageUrl) {
     const {
       data: { text },
     } = await Tesseract.recognize(cropBuffer, "eng", {
+      psm: 6,
+      oem: 1,
       logger: () => { },
     });
 
@@ -79,7 +107,7 @@ async function extractTestResult(imageUrl) {
       result = "Poor";
     }
 
-    OCR_CACHE.set(imageUrl, result);
+    setCacheValue(OCR_CACHE, imageUrl, result);
 
     return result;
   } catch (error) {
@@ -90,7 +118,6 @@ async function extractTestResult(imageUrl) {
 }
 
 async function getStatusList(school_id) {
-  console.log(school_id);
   const { data } = await api.get("/student-evaluation/status-list", {
     params: {
       school_id: school_id,

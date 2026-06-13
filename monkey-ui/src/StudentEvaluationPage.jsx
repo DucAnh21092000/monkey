@@ -16,7 +16,7 @@ import {
   Tag,
 } from "antd";
 import axios from "axios";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   Chart as ChartJS,
   ArcElement,
@@ -38,9 +38,76 @@ ChartJS.register(
 );
 const { Search } = Input;
 
+const SCHOOL_CACHE_KEY = "monkey-school-list-cache";
+const SCHOOL_RECENT_KEY = "monkey-school-recent-cache";
+const SCHOOL_CACHE_TTL = 1000 * 60 * 60 * 24 * 7;
+
+function getCachedSchools() {
+  try {
+    const cached = localStorage.getItem(SCHOOL_CACHE_KEY);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached);
+    if (!parsed?.data || Date.now() - parsed.timestamp > SCHOOL_CACHE_TTL) {
+      localStorage.removeItem(SCHOOL_CACHE_KEY);
+      return null;
+    }
+
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedSchools(data) {
+  try {
+    localStorage.setItem(
+      SCHOOL_CACHE_KEY,
+      JSON.stringify({
+        data,
+        timestamp: Date.now(),
+      }),
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function getRecentSchoolIds() {
+  try {
+    const cached = localStorage.getItem(SCHOOL_RECENT_KEY);
+    if (!cached) return [];
+    const parsed = JSON.parse(cached);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function setRecentSchoolIds(ids) {
+  try {
+    localStorage.setItem(SCHOOL_RECENT_KEY, JSON.stringify(ids));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function sortSchoolsByRecent(schools, recentIds = []) {
+  const recentSet = new Set(recentIds);
+
+  return [...schools].sort((a, b) => {
+    const aRecent = recentSet.has(a.value) ? 1 : 0;
+    const bRecent = recentSet.has(b.value) ? 1 : 0;
+
+    if (aRecent !== bRecent) return bRecent - aRecent;
+    return (a.label || "").localeCompare(b.label || "");
+  });
+}
+
 export default function StudentReportPage() {
   const [selectedSchool, setSelectedSchool] = useState();
   const [keyword, setKeyword] = useState("");
+  const deferredKeyword = useDeferredValue(keyword);
   const [listSchool, setListSchool] = useState([]);
   const [listStudent, setListStudent] = useState([]);
   const [pagination, setPagination] = useState({
@@ -49,6 +116,8 @@ export default function StudentReportPage() {
     total: 0,
   });
   const [openFilter, setOpenFilter] = useState(false);
+  const [recentSchoolIds, setRecentSchoolIdsState] = useState(() => getRecentSchoolIds());
+  const [pendingRecentSchool, setPendingRecentSchool] = useState();
 
   const [filters, setFilters] = useState({
     school: undefined,
@@ -218,10 +287,26 @@ export default function StudentReportPage() {
     };
   }, [listStudent]);
 
-  const initData = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const cachedSchools = getCachedSchools();
+    if (cachedSchools) {
+      window.setTimeout(() => {
+        if (!cancelled) {
+          setListSchool(sortSchoolsByRecent(cachedSchools, recentSchoolIds));
+        }
+      }, 0);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     axios
       .get("https://monkey-1gz4.onrender.com/api/school-list")
       .then((schoolResponse) => {
+        if (cancelled) return;
+
         const newListSchool =
           schoolResponse.data?.data?.map((item) => ({
             ...item,
@@ -229,16 +314,18 @@ export default function StudentReportPage() {
             value: item.school_id,
           })) ?? [];
 
-        setListSchool(newListSchool);
+        const sortedSchools = sortSchoolsByRecent(newListSchool, recentSchoolIds);
+        setListSchool(sortedSchools);
+        setCachedSchools(sortedSchools);
       })
       .catch((error) => {
         console.error("Error fetching schools:", error);
       });
-  }, []);
 
-  useEffect(() => {
-    initData();
-  }, [initData]);
+    return () => {
+      cancelled = true;
+    };
+  }, [recentSchoolIds]);
 
 
 
@@ -253,6 +340,23 @@ export default function StudentReportPage() {
 
     return () => window.clearTimeout(timer);
   }, [selectedSchool, pagination.pageSize, fetchStudents]);
+
+  const handleSchoolChange = (value) => {
+    setSelectedSchool(value);
+    setPendingRecentSchool(value || undefined);
+  };
+
+  const handleSchoolDropdownVisibleChange = (open) => {
+    if (open || !pendingRecentSchool) {
+      return;
+    }
+
+    const recentIds = getRecentSchoolIds();
+    const nextRecentIds = [pendingRecentSchool, ...recentIds.filter((id) => id !== pendingRecentSchool)].slice(0, 8);
+    setRecentSchoolIdsState(nextRecentIds);
+    setRecentSchoolIds(nextRecentIds);
+    setPendingRecentSchool(undefined);
+  };
 
   const highlightText = (text, keyword) => {
     if (!keyword) return text;
@@ -347,7 +451,7 @@ export default function StudentReportPage() {
     {
       title: "STT",
       dataIndex: "stt",
-      width: 70,
+      width: 50,
       fixed: "left",
       render: (value, record, index) => (
         <span style={{ fontWeight: 600 }}>{index + 1}</span>
@@ -355,7 +459,8 @@ export default function StudentReportPage() {
     },
     {
       title: "",
-      width: 70,
+      width: 55,
+      fixed: "left",
       render: (_, record) => (
         <Avatar
           size={48}
@@ -371,12 +476,15 @@ export default function StudentReportPage() {
     {
       title: "Student Name",
       dataIndex: "student_name",
-      width: 220,
+      width: 200,
+      ellipsis: true,
       render: (text) => highlightText(text, keyword),
     },
     {
       title: "Class",
       dataIndex: "class_name",
+      width: 120,
+      ellipsis: true,
       filters: classFilters,
       filterSearch: true,
       onFilter: (value, record) => record.class_id === value,
@@ -384,6 +492,8 @@ export default function StudentReportPage() {
     {
       title: "School",
       dataIndex: "school_name",
+      width: 180,
+      ellipsis: true,
       filters: schoolFilters,
       onFilter: (value, record) => record.school_name === value,
       render: (value) => <Tag color="blue">{value}</Tag>,
@@ -391,6 +501,8 @@ export default function StudentReportPage() {
     {
       title: "Report",
       dataIndex: "report_name",
+      width: 120,
+      ellipsis: true,
       filters: reportFilters,
       filterSearch: true,
       onFilter: (value, record) => record.report_name === value,
@@ -398,6 +510,8 @@ export default function StudentReportPage() {
     {
       title: "Test Result",
       dataIndex: "test_result",
+      width: 110,
+      ellipsis: true,
       filters: testResultFilters,
       onFilter: (value, record) => record.test_result === value,
       render: (value) => {
@@ -431,6 +545,7 @@ export default function StudentReportPage() {
     {
       title: "Video",
       dataIndex: "video",
+      width: 120,
       render: (url) => (
         <a href={url} target="_blank" rel="noreferrer">
           View Video
@@ -458,13 +573,24 @@ export default function StudentReportPage() {
     });
   };
 
+  const handleRemoveRecentSchool = (schoolId) => {
+    if (!schoolId) {
+      return;
+    }
+
+    const nextRecentIds = recentSchoolIds.filter((id) => id !== schoolId);
+    setRecentSchoolIdsState(nextRecentIds);
+    setRecentSchoolIds(nextRecentIds);
+    setPendingRecentSchool(undefined);
+  };
+
   const filteredStudentsMulti = useMemo(() => {
     return listStudent.filter((student) => {
       const matchKeyword =
-        !keyword ||
+        !deferredKeyword ||
         student.student_name
           ?.toLowerCase()
-          .includes(keyword.toLowerCase());
+          .includes(deferredKeyword.toLowerCase());
 
       const matchSchool =
         !filters.school ||
@@ -490,12 +616,41 @@ export default function StudentReportPage() {
         matchTestResult
       );
     });
-  }, [listStudent, keyword, filters]);
+  }, [listStudent, deferredKeyword, filters]);
 
   const visibleCount = filteredStudentsMulti.length;
   const strongResultCount = filteredStudentsMulti.filter((student) =>
     ["Very good", "Good"].includes(student.test_result)
   ).length;
+  const schoolOptions = useMemo(() => {
+    const recentSchools = listSchool
+      .filter((school) => recentSchoolIds.includes(school.value))
+      .map((school) => ({
+        ...school,
+        data: {
+          ...school.data,
+          isRecent: true,
+        },
+      }));
+    const otherSchools = listSchool
+      .filter((school) => !recentSchoolIds.includes(school.value))
+      .map((school) => ({
+        ...school,
+        data: {
+          ...school.data,
+          isRecent: false,
+        },
+      }));
+
+    return [
+      ...(recentSchools.length > 0
+        ? [{ label: "Recently used", title: true, disabled: true }, ...recentSchools]
+        : []),
+      ...(otherSchools.length > 0
+        ? [{ label: "All schools", title: true, disabled: true }, ...otherSchools]
+        : []),
+    ];
+  }, [listSchool, recentSchoolIds]);
   const activeFilterCount = [
     Boolean(keyword?.trim()),
     filters.school !== undefined,
@@ -592,10 +747,50 @@ export default function StudentReportPage() {
                   placeholder="🏫 Chọn trường"
                   className="modern-select"
                   style={{ width: "100%" }}
-                  options={listSchool}
+                  options={schoolOptions}
                   value={selectedSchool}
-                  onChange={setSelectedSchool}
+                  onChange={handleSchoolChange}
+                  onDropdownVisibleChange={handleSchoolDropdownVisibleChange}
                   optionFilterProp="label"
+                  optionRender={(option) => {
+                    if (option.data?.title) {
+                      return <span style={{ fontWeight: 700, color: "#6366f1" }}>{option.label}</span>;
+                    }
+
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%" }}>
+                        <span>{option.label}</span>
+                        {option.data?.isRecent && (
+                          <button
+                            type="button"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleRemoveRecentSchool(option.value);
+                            }}
+                            style={{
+                              border: "1px solid #d9d9d9",
+                              background: "#fff7e6",
+                              color: "#d46b08",
+                              cursor: "pointer",
+                              fontSize: 12,
+                              lineHeight: 1,
+                              padding: "4px 8px",
+                              borderRadius: 999,
+                              fontWeight: 600,
+                            }}
+                            aria-label={`Remove ${option.label} from recent schools`}
+                          >
+                            ✕ Remove
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }}
                 />
               </Col>
 
@@ -618,6 +813,7 @@ export default function StudentReportPage() {
               columns={columns}
               dataSource={filteredStudentsMulti}
               scroll={{ x: 1400 }}
+              tableLayout="fixed"
               onChange={handleTableChange}
               className="student-table"
               pagination={{
