@@ -59,6 +59,25 @@ function getCachedSchools() {
   }
 }
 
+const resultMap = {
+  1: {
+    label: "Cần cải thiện - Need Improvement",
+    color: "error",
+  },
+  2: {
+    label: "Đạt - Good",
+    color: "processing",
+  },
+  3: {
+    label: "Rất tốt - Very Good",
+    color: "success",
+  },
+  4: {
+    label: "Vượt trội - Excellent",
+    color: "gold",
+  },
+};
+
 function setCachedSchools(data) {
   try {
     localStorage.setItem(
@@ -147,13 +166,12 @@ export default function StudentReportPage() {
             },
           },
         );
-
-        setListStudent(response.data?.data ?? []);
+        setListStudent(response.data?.data?.data ?? []);
 
         setPagination({
           current: page,
           pageSize,
-          total: response.data?.total ?? 0,
+          total: response.data?.data?.total ?? 0,
         });
       } catch (error) {
         console.error("Error fetching students:", error);
@@ -168,8 +186,8 @@ export default function StudentReportPage() {
     const summary = {};
 
     listStudent.forEach((student) => {
-      if (student.test_result) {
-        const key = student.test_result;
+      if (student.verdict) {
+        const key = student.verdict;
         summary[key] = (summary[key] || 0) + 1;
       }
     });
@@ -178,7 +196,7 @@ export default function StudentReportPage() {
     const newLabel = Object.keys(summary).map((key) => {
       const count = summary[key];
       const percent = total > 0 ? ((count / total) * 100).toFixed(2) : "0.00";
-      return `${key} (${count}) - ${percent}%`;
+      return `${resultMap[key]?.label || key} (${count}) - ${percent}%`;
     });
 
     return {
@@ -272,7 +290,7 @@ export default function StudentReportPage() {
   }, [listStudent]);
 
   const reportAvailabilityChartData = useMemo(() => {
-    const withReport = listStudent.filter((student) => student.test_result).length;
+    const withReport = listStudent.filter((student) => student.verdict).length;
     const withoutReport = listStudent.length - withReport;
     const total = listStudent.length || 1;
 
@@ -445,10 +463,11 @@ export default function StudentReportPage() {
   const testResultFilters = useMemo(
     () =>
       [
-        ...new Set(listStudent.map((item) => item.test_result).filter(Boolean)),
+        ...new Set(listStudent.map((item) => item.verdict).filter(Boolean)),
       ].map((value) => ({
-        text: value,
+        text: resultMap[value]?.label || value,
         value,
+        label: resultMap[value]?.label || value,
       })),
     [listStudent],
   );
@@ -515,20 +534,21 @@ export default function StudentReportPage() {
     },
     {
       title: "Test Result",
-      dataIndex: "test_result",
-      width: 110,
+      dataIndex: "verdict",
+      width: 180,
       ellipsis: true,
       filters: testResultFilters,
-      onFilter: (value, record) => record.test_result === value,
+      onFilter: (value, record) => record.verdict === value,
       render: (value) => {
-        const colorMap = {
-          "Very good": "green",
-          Good: "blue",
-          Average: "orange",
-          Poor: "red",
-        };
 
-        return <Tag color={colorMap[value] || "default"}>{value || "-"}</Tag>;
+
+        const result = resultMap[value];
+
+        return (
+          <Tag color={result?.color}>
+            {result?.label || "-"}
+          </Tag>
+        );
       },
     },
     {
@@ -616,7 +636,7 @@ export default function StudentReportPage() {
 
       const matchTestResult =
         !filters.testResult ||
-        student.test_result === filters.testResult;
+        student.verdict === filters.testResult;
 
       const matchStudentName =
         !filters.studentName ||
@@ -637,7 +657,7 @@ export default function StudentReportPage() {
 
   const visibleCount = filteredStudentsMulti.length;
   const strongResultCount = filteredStudentsMulti.filter((student) =>
-    ["Very good", "Good"].includes(student.test_result)
+    [2, 3, 4].includes(student.verdict)
   ).length;
   const schoolOptions = useMemo(() => {
     const visibleSchools = listSchool.slice(0, visibleSchoolCount);
@@ -718,7 +738,7 @@ export default function StudentReportPage() {
       <div className="page-hero">
         <div>
           <p className="hero-eyebrow">🌸 Student evaluation dashboard</p>
-          <p className="hero-copyright">Copyright © Diggory Dinh with love</p>
+          <p className="hero-copyright">Copyright © <span style={{ color: '#f8a5c2' }}>Diggory Dinh</span> with love</p>
           <h1>Follow every student’s progress with a calm, clear view.</h1>
 
         </div>
@@ -813,8 +833,6 @@ export default function StudentReportPage() {
                     const searchText = option?.data?.searchText ?? "";
                     return searchText.toLowerCase().includes(input.toLowerCase());
                   }}
-                  virtual
-                  listHeight={320}
                 />
               </Col>
 

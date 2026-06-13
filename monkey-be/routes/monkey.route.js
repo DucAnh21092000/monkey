@@ -35,7 +35,6 @@ router.get("/filters", async (req, res) => {
 });
 
 router.get("/school-list", async (req, res) => {
-    console.log("Received request for school list");
     try {
         const schools = await getSchools();
 

@@ -107,7 +107,7 @@ async function extractTestResult(imageUrl) {
       result = "Need improvement";
     }
 
-    console.log(lower);
+
     setCacheValue(OCR_CACHE, imageUrl, result);
 
     return result;
@@ -129,24 +129,7 @@ async function getStatusList(school_id) {
 
   const records = data.data.data || [];
 
-  const enrichedData = await Promise.all(
-    records.map((item, index) =>
-      limit(async () => {
-        const testResult = await extractTestResult(item.image);
-
-        return {
-          ...item,
-          test_result: testResult,
-          stt: index + 1,
-        };
-      }),
-    ),
-  );
-
-  return {
-    ...data,
-    data: enrichedData,
-  };
+  return data
 }
 
 async function getFilters() {
