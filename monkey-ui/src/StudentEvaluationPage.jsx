@@ -41,7 +41,7 @@ const { Search } = Input;
 export default function StudentReportPage() {
   const [selectedSchool, setSelectedSchool] = useState();
   const [keyword, setKeyword] = useState("");
-  const [listSchool, setListSchool] = useState([])
+  const [listSchool, setListSchool] = useState([]);
   const [listStudent, setListStudent] = useState([]);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -70,7 +70,7 @@ export default function StudentReportPage() {
               page,
               pageSize,
             },
-          }
+          },
         );
 
         setListStudent(response.data?.data ?? []);
@@ -86,7 +86,7 @@ export default function StudentReportPage() {
         setLoading(false);
       }
     },
-    []
+    [],
   );
 
   const chartData = useMemo(() => {
@@ -304,17 +304,6 @@ export default function StudentReportPage() {
     [listStudent],
   );
 
-  const handleReset = () => {
-    setSelectedSchool(undefined);
-    setKeyword("");
-    setFilters({
-      school: undefined,
-      class: undefined,
-      report: undefined,
-      testResult: undefined,
-    });
-  };
-
   const classFilters = useMemo(
     () => [
       ...new Map(
@@ -360,7 +349,9 @@ export default function StudentReportPage() {
       dataIndex: "stt",
       width: 70,
       fixed: "left",
-      render: (value, record, index) => <span style={{ fontWeight: 600 }}>{index + 1}</span>,
+      render: (value, record, index) => (
+        <span style={{ fontWeight: 600 }}>{index + 1}</span>
+      ),
     },
     {
       title: "",
@@ -452,7 +443,7 @@ export default function StudentReportPage() {
     fetchStudents(
       selectedSchool,
       paginationConfig.current,
-      paginationConfig.pageSize
+      paginationConfig.pageSize,
     );
   };
 
