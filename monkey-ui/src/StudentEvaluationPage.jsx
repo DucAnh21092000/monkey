@@ -138,7 +138,7 @@ export default function StudentReportPage() {
         setLoading(true);
 
         const response = await axios.get(
-          "http://localhost:3000/api/status-list",
+          "https://monkey-1gz4.onrender.com/api/status-list",
           {
             params: {
               school_id: schoolId,
@@ -309,7 +309,7 @@ export default function StudentReportPage() {
     }
 
     axios
-      .get("http://localhost:3000/api/school-list")
+      .get("https://monkey-1gz4.onrender.com/api/school-list")
       .then((schoolResponse) => {
         if (cancelled) return;
 
