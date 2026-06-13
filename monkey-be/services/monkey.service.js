@@ -88,7 +88,7 @@ async function extractTestResult(imageUrl) {
     const {
       data: { text },
     } = await Tesseract.recognize(cropBuffer, "eng", {
-      psm: 6,
+      psm: 3,
       oem: 1,
       logger: () => { },
     });
@@ -101,12 +101,13 @@ async function extractTestResult(imageUrl) {
       result = "Very good";
     } else if (lower.includes("good")) {
       result = "Good";
-    } else if (lower.includes("average")) {
-      result = "Average";
-    } else if (lower.includes("poor")) {
-      result = "Poor";
+    } else if (lower.includes("excellen")) {
+      result = "Excellent";
+    } else if (lower.includes("improv")) {
+      result = "Need improvement";
     }
 
+    console.log(lower);
     setCacheValue(OCR_CACHE, imageUrl, result);
 
     return result;
@@ -122,7 +123,7 @@ async function getStatusList(school_id) {
     params: {
       school_id: school_id,
       page: 1,
-      limit: 100,
+      limit: 1000,
     },
   });
 

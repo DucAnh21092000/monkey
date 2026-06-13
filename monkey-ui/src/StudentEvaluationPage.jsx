@@ -118,13 +118,19 @@ export default function StudentReportPage() {
   const [openFilter, setOpenFilter] = useState(false);
   const [recentSchoolIds, setRecentSchoolIdsState] = useState(() => getRecentSchoolIds());
   const [pendingRecentSchool, setPendingRecentSchool] = useState();
+  const [visibleSchoolCount, setVisibleSchoolCount] = useState(60);
 
-  const [filters, setFilters] = useState({
+  const defaultFilters = {
     school: undefined,
     class: undefined,
     report: undefined,
     testResult: undefined,
-  });
+    studentName: undefined,
+  };
+
+  const [filters, setFilters] = useState(defaultFilters);
+  const [draftFilters, setDraftFilters] = useState(defaultFilters);
+
   const [loading, setLoading] = useState(false);
   const fetchStudents = useCallback(
     async (schoolId, page = 1, pageSize = 10) => {
@@ -132,7 +138,7 @@ export default function StudentReportPage() {
         setLoading(true);
 
         const response = await axios.get(
-          "https://monkey-1gz4.onrender.com/api/status-list",
+          "http://localhost:3000/api/status-list",
           {
             params: {
               school_id: schoolId,
@@ -303,7 +309,7 @@ export default function StudentReportPage() {
     }
 
     axios
-      .get("https://monkey-1gz4.onrender.com/api/school-list")
+      .get("http://localhost:3000/api/school-list")
       .then((schoolResponse) => {
         if (cancelled) return;
 
@@ -564,16 +570,11 @@ export default function StudentReportPage() {
 
   const handleResetFilter = () => {
     setKeyword("");
-
-    setFilters({
-      school: undefined,
-      class: undefined,
-      report: undefined,
-      testResult: undefined,
-    });
+    setFilters(defaultFilters);
+    setDraftFilters(defaultFilters);
   };
 
-  const handleRemoveRecentSchool = (schoolId) => {
+  const handleRemoveRecentSchool = useCallback((schoolId) => {
     if (!schoolId) {
       return;
     }
@@ -582,7 +583,16 @@ export default function StudentReportPage() {
     setRecentSchoolIdsState(nextRecentIds);
     setRecentSchoolIds(nextRecentIds);
     setPendingRecentSchool(undefined);
-  };
+  }, [recentSchoolIds]);
+
+  const handleSchoolPopupScroll = useCallback((event) => {
+    const target = event.target;
+    const reachedBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 24;
+
+    if (reachedBottom && visibleSchoolCount < listSchool.length) {
+      setVisibleSchoolCount((current) => Math.min(current + 30, listSchool.length));
+    }
+  }, [listSchool.length, visibleSchoolCount]);
 
   const filteredStudentsMulti = useMemo(() => {
     return listStudent.filter((student) => {
@@ -608,12 +618,19 @@ export default function StudentReportPage() {
         !filters.testResult ||
         student.test_result === filters.testResult;
 
+      const matchStudentName =
+        !filters.studentName ||
+        student.student_name
+          ?.toLowerCase()
+          .includes(filters.studentName.toLowerCase());
+
       return (
         matchKeyword &&
         matchSchool &&
         matchClass &&
         matchReport &&
-        matchTestResult
+        matchTestResult &&
+        matchStudentName
       );
     });
   }, [listStudent, deferredKeyword, filters]);
@@ -623,22 +640,58 @@ export default function StudentReportPage() {
     ["Very good", "Good"].includes(student.test_result)
   ).length;
   const schoolOptions = useMemo(() => {
-    const recentSchools = listSchool
+    const visibleSchools = listSchool.slice(0, visibleSchoolCount);
+
+    const recentSchools = visibleSchools
       .filter((school) => recentSchoolIds.includes(school.value))
       .map((school) => ({
         ...school,
+        label: (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%" }}>
+            <span>{school.label}</span>
+            <button
+              type="button"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                handleRemoveRecentSchool(school.value);
+              }}
+              style={{
+                border: "1px solid #d9d9d9",
+                background: "#fff7e6",
+                color: "#d46b08",
+                cursor: "pointer",
+                fontSize: 12,
+                lineHeight: 1,
+                padding: "4px 8px",
+                borderRadius: 999,
+                fontWeight: 600,
+              }}
+              aria-label={`Remove ${school.label} from recent schools`}
+            >
+              ✕
+            </button>
+          </div>
+        ),
+        value: school.value,
         data: {
-          ...school.data,
           isRecent: true,
+          searchText: String(school.label ?? ""),
         },
       }));
-    const otherSchools = listSchool
+    const otherSchools = visibleSchools
       .filter((school) => !recentSchoolIds.includes(school.value))
       .map((school) => ({
         ...school,
+        label: school.label,
+        value: school.value,
         data: {
-          ...school.data,
           isRecent: false,
+          searchText: String(school.label ?? ""),
         },
       }));
 
@@ -650,13 +703,14 @@ export default function StudentReportPage() {
         ? [{ label: "All schools", title: true, disabled: true }, ...otherSchools]
         : []),
     ];
-  }, [listSchool, recentSchoolIds]);
+  }, [handleRemoveRecentSchool, listSchool, recentSchoolIds, visibleSchoolCount]);
   const activeFilterCount = [
     Boolean(keyword?.trim()),
     filters.school !== undefined,
     filters.class !== undefined,
     filters.report !== undefined,
     filters.testResult !== undefined,
+    Boolean(filters.studentName?.trim()),
   ].filter(Boolean).length;
 
   return (
@@ -681,7 +735,7 @@ export default function StudentReportPage() {
             <div className="stat-card__icon">
               <TeamOutlined />
             </div>
-            <Statistic title="Total Students" value={listStudent.length} />
+            <Statistic title="Total Students" value={pagination.total} />
             <p className="stat-card__text">Students currently visible in the report</p>
           </Card>
         </Col>
@@ -723,7 +777,10 @@ export default function StudentReportPage() {
                   <Button
                     type="primary"
                     icon={<FilterOutlined />}
-                    onClick={() => setOpenFilter(true)}
+                    onClick={() => {
+                      setDraftFilters(filters);
+                      setOpenFilter(true);
+                    }}
                     className="toolbar-btn toolbar-btn-primary"
                   >
                     Filter
@@ -751,46 +808,13 @@ export default function StudentReportPage() {
                   value={selectedSchool}
                   onChange={handleSchoolChange}
                   onDropdownVisibleChange={handleSchoolDropdownVisibleChange}
-                  optionFilterProp="label"
-                  optionRender={(option) => {
-                    if (option.data?.title) {
-                      return <span style={{ fontWeight: 700, color: "#6366f1" }}>{option.label}</span>;
-                    }
-
-                    return (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%" }}>
-                        <span>{option.label}</span>
-                        {option.data?.isRecent && (
-                          <button
-                            type="button"
-                            onMouseDown={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                            }}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              handleRemoveRecentSchool(option.value);
-                            }}
-                            style={{
-                              border: "1px solid #d9d9d9",
-                              background: "#fff7e6",
-                              color: "#d46b08",
-                              cursor: "pointer",
-                              fontSize: 12,
-                              lineHeight: 1,
-                              padding: "4px 8px",
-                              borderRadius: 999,
-                              fontWeight: 600,
-                            }}
-                            aria-label={`Remove ${option.label} from recent schools`}
-                          >
-                            ✕ Remove
-                          </button>
-                        )}
-                      </div>
-                    );
+                  onPopupScroll={handleSchoolPopupScroll}
+                  filterOption={(input, option) => {
+                    const searchText = option?.data?.searchText ?? "";
+                    return searchText.toLowerCase().includes(input.toLowerCase());
                   }}
+                  virtual
+                  listHeight={320}
                 />
               </Col>
 
@@ -986,34 +1010,37 @@ export default function StudentReportPage() {
         onClose={() => setOpenFilter(false)}
         footer={
           <Space>
-            <Button type="primary" onClick={() => setOpenFilter(false)}>
+            <Button
+              type="primary"
+              onClick={() => {
+                setFilters(draftFilters);
+                setOpenFilter(false);
+              }}
+            >
               Apply
             </Button>
 
             <Button
-              onClick={() =>
-                setFilters({
-                  school: undefined,
-                  class: undefined,
-                  report: undefined,
-                  testResult: undefined,
-                })
-              }
+              onClick={() => {
+                setDraftFilters(defaultFilters);
+              }}
             >
               Clear
             </Button>
+
             <Button onClick={() => setOpenFilter(false)}>Close</Button>
           </Space>
         }
       >
         <Form layout="vertical">
+
           <Form.Item label="Class">
             <Select
               allowClear
               options={classFilters}
-              value={filters.class}
+              value={draftFilters.class}
               onChange={(value) =>
-                setFilters((prev) => ({
+                setDraftFilters((prev) => ({
                   ...prev,
                   class: value,
                 }))
@@ -1025,9 +1052,9 @@ export default function StudentReportPage() {
             <Select
               allowClear
               options={reportOptions}
-              value={filters.report}
+              value={draftFilters.report}
               onChange={(value) =>
-                setFilters((prev) => ({
+                setDraftFilters((prev) => ({
                   ...prev,
                   report: value,
                 }))
@@ -1039,9 +1066,9 @@ export default function StudentReportPage() {
             <Select
               allowClear
               options={testResultFilters}
-              value={filters.testResult}
+              value={draftFilters.testResult}
               onChange={(value) =>
-                setFilters((prev) => ({
+                setDraftFilters((prev) => ({
                   ...prev,
                   testResult: value,
                 }))

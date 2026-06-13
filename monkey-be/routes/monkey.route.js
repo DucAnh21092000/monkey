@@ -9,10 +9,10 @@ const {
 
 
 router.get("/status-list", async (req, res) => {
-    console.log("Received school_id:");
-    const { school_id } = req.query;
+   
+    const { school_id, page, pageSize } = req.query;
     try {
-        const data = await getStatusList(school_id);
+        const data = await getStatusList(school_id, page, pageSize);
 
         res.json(data);
     } catch (err) {
