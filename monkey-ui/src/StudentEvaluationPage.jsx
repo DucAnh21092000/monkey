@@ -1,4 +1,9 @@
-import { BankOutlined, FilterOutlined, TeamOutlined, TrophyOutlined } from "@ant-design/icons";
+import {
+  BankOutlined,
+  FilterOutlined,
+  TeamOutlined,
+  TrophyOutlined,
+} from "@ant-design/icons";
 import {
   Avatar,
   Button,
@@ -16,7 +21,13 @@ import {
   Tag,
 } from "antd";
 import axios from "axios";
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Chart as ChartJS,
   ArcElement,
@@ -34,7 +45,7 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   Tooltip,
-  Legend
+  Legend,
 );
 const { Search } = Input;
 
@@ -135,7 +146,9 @@ export default function StudentReportPage() {
     total: 0,
   });
   const [openFilter, setOpenFilter] = useState(false);
-  const [recentSchoolIds, setRecentSchoolIdsState] = useState(() => getRecentSchoolIds());
+  const [recentSchoolIds, setRecentSchoolIdsState] = useState(() =>
+    getRecentSchoolIds(),
+  );
   const [pendingRecentSchool, setPendingRecentSchool] = useState();
   const [visibleSchoolCount, setVisibleSchoolCount] = useState(60);
 
@@ -149,6 +162,9 @@ export default function StudentReportPage() {
 
   const [filters, setFilters] = useState(defaultFilters);
   const [draftFilters, setDraftFilters] = useState(defaultFilters);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [exporting, setExporting] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const fetchStudents = useCallback(
@@ -181,6 +197,55 @@ export default function StudentReportPage() {
     },
     [],
   );
+
+  const rowSelection = {
+    selectedRowKeys,
+
+    onChange: (keys, rows) => {
+      setSelectedRowKeys(keys);
+      setSelectedRows(rows);
+    },
+  };
+
+  const handleExportVideos = async () => {
+    if (!selectedRows.length) {
+      return;
+    }
+
+    try {
+      setExporting(true);
+
+      const response = await axios.post(
+        "https://monkey-1gz4.onrender.com/api/export-videos",
+        {
+          students: selectedRows.map((item) => ({
+            student_name: item.student_name,
+            video: item.video,
+          })),
+        },
+        {
+          responseType: "blob",
+        },
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `videos-${Date.now()}.zip`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const chartData = useMemo(() => {
     const summary = {};
@@ -226,10 +291,14 @@ export default function StudentReportPage() {
       summary[key] = (summary[key] || 0) + 1;
     });
 
-    const totalReports = Object.values(summary).reduce((acc, value) => acc + value, 0);
+    const totalReports = Object.values(summary).reduce(
+      (acc, value) => acc + value,
+      0,
+    );
     const labels = Object.keys(summary).map((key) => {
       const count = summary[key];
-      const percent = totalReports > 0 ? ((count / totalReports) * 100).toFixed(2) : "0.00";
+      const percent =
+        totalReports > 0 ? ((count / totalReports) * 100).toFixed(2) : "0.00";
       return `${key} (${count}) - ${percent}%`;
     });
 
@@ -266,14 +335,22 @@ export default function StudentReportPage() {
       .filter(([, count]) => count > 1)
       .sort((a, b) => b[1] - a[1]);
 
-    const totalDuplicates = duplicates.reduce((acc, [, count]) => acc + count, 0);
+    const totalDuplicates = duplicates.reduce(
+      (acc, [, count]) => acc + count,
+      0,
+    );
     const labels = duplicates.length
       ? duplicates.map(([name, count]) => {
-        const percent = totalDuplicates > 0 ? ((count / totalDuplicates) * 100).toFixed(2) : "0.00";
-        return `${name} (${count}) - ${percent}%`;
-      })
+          const percent =
+            totalDuplicates > 0
+              ? ((count / totalDuplicates) * 100).toFixed(2)
+              : "0.00";
+          return `${name} (${count}) - ${percent}%`;
+        })
       : ["No duplicates"];
-    const values = duplicates.length ? duplicates.map(([, count]) => count) : [0];
+    const values = duplicates.length
+      ? duplicates.map(([, count]) => count)
+      : [0];
 
     return {
       labels,
@@ -338,7 +415,10 @@ export default function StudentReportPage() {
             value: item.school_id,
           })) ?? [];
 
-        const sortedSchools = sortSchoolsByRecent(newListSchool, recentSchoolIds);
+        const sortedSchools = sortSchoolsByRecent(
+          newListSchool,
+          recentSchoolIds,
+        );
         setListSchool(sortedSchools);
         setCachedSchools(sortedSchools);
       })
@@ -350,8 +430,6 @@ export default function StudentReportPage() {
       cancelled = true;
     };
   }, [recentSchoolIds]);
-
-
 
   useEffect(() => {
     if (!selectedSchool) {
@@ -376,7 +454,10 @@ export default function StudentReportPage() {
     }
 
     const recentIds = getRecentSchoolIds();
-    const nextRecentIds = [pendingRecentSchool, ...recentIds.filter((id) => id !== pendingRecentSchool)].slice(0, 8);
+    const nextRecentIds = [
+      pendingRecentSchool,
+      ...recentIds.filter((id) => id !== pendingRecentSchool),
+    ].slice(0, 8);
     setRecentSchoolIdsState(nextRecentIds);
     setRecentSchoolIds(nextRecentIds);
     setPendingRecentSchool(undefined);
@@ -418,7 +499,7 @@ export default function StudentReportPage() {
         label: value,
         value,
       })),
-    [listStudent]
+    [listStudent],
   );
 
   const reportFilters = useMemo(
@@ -448,7 +529,6 @@ export default function StudentReportPage() {
     [listStudent],
   );
 
-
   const schoolFilters = useMemo(
     () =>
       [
@@ -462,13 +542,13 @@ export default function StudentReportPage() {
 
   const testResultFilters = useMemo(
     () =>
-      [
-        ...new Set(listStudent.map((item) => item.verdict).filter(Boolean)),
-      ].map((value) => ({
-        text: resultMap[value]?.label || value,
-        value,
-        label: resultMap[value]?.label || value,
-      })),
+      [...new Set(listStudent.map((item) => item.verdict).filter(Boolean))].map(
+        (value) => ({
+          text: resultMap[value]?.label || value,
+          value,
+          label: resultMap[value]?.label || value,
+        }),
+      ),
     [listStudent],
   );
 
@@ -540,15 +620,9 @@ export default function StudentReportPage() {
       filters: testResultFilters,
       onFilter: (value, record) => record.verdict === value,
       render: (value) => {
-
-
         const result = resultMap[value];
 
-        return (
-          <Tag color={result?.color}>
-            {result?.label || "-"}
-          </Tag>
-        );
+        return <Tag color={result?.color}>{result?.label || "-"}</Tag>;
       },
     },
     {
@@ -594,25 +668,34 @@ export default function StudentReportPage() {
     setDraftFilters(defaultFilters);
   };
 
-  const handleRemoveRecentSchool = useCallback((schoolId) => {
-    if (!schoolId) {
-      return;
-    }
+  const handleRemoveRecentSchool = useCallback(
+    (schoolId) => {
+      if (!schoolId) {
+        return;
+      }
 
-    const nextRecentIds = recentSchoolIds.filter((id) => id !== schoolId);
-    setRecentSchoolIdsState(nextRecentIds);
-    setRecentSchoolIds(nextRecentIds);
-    setPendingRecentSchool(undefined);
-  }, [recentSchoolIds]);
+      const nextRecentIds = recentSchoolIds.filter((id) => id !== schoolId);
+      setRecentSchoolIdsState(nextRecentIds);
+      setRecentSchoolIds(nextRecentIds);
+      setPendingRecentSchool(undefined);
+    },
+    [recentSchoolIds],
+  );
 
-  const handleSchoolPopupScroll = useCallback((event) => {
-    const target = event.target;
-    const reachedBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 24;
+  const handleSchoolPopupScroll = useCallback(
+    (event) => {
+      const target = event.target;
+      const reachedBottom =
+        target.scrollTop + target.clientHeight >= target.scrollHeight - 24;
 
-    if (reachedBottom && visibleSchoolCount < listSchool.length) {
-      setVisibleSchoolCount((current) => Math.min(current + 30, listSchool.length));
-    }
-  }, [listSchool.length, visibleSchoolCount]);
+      if (reachedBottom && visibleSchoolCount < listSchool.length) {
+        setVisibleSchoolCount((current) =>
+          Math.min(current + 30, listSchool.length),
+        );
+      }
+    },
+    [listSchool.length, visibleSchoolCount],
+  );
 
   const filteredStudentsMulti = useMemo(() => {
     return listStudent.filter((student) => {
@@ -623,20 +706,15 @@ export default function StudentReportPage() {
           .includes(deferredKeyword.toLowerCase());
 
       const matchSchool =
-        !filters.school ||
-        student.school_id === filters.school;
+        !filters.school || student.school_id === filters.school;
 
-      const matchClass =
-        !filters.class ||
-        student.class_id === filters.class;
+      const matchClass = !filters.class || student.class_id === filters.class;
 
       const matchReport =
-        !filters.report ||
-        student.report_name === filters.report;
+        !filters.report || student.report_name === filters.report;
 
       const matchTestResult =
-        !filters.testResult ||
-        student.verdict === filters.testResult;
+        !filters.testResult || student.verdict === filters.testResult;
 
       const matchStudentName =
         !filters.studentName ||
@@ -657,7 +735,7 @@ export default function StudentReportPage() {
 
   const visibleCount = filteredStudentsMulti.length;
   const strongResultCount = filteredStudentsMulti.filter((student) =>
-    [2, 3, 4].includes(student.verdict)
+    [2, 3, 4].includes(student.verdict),
   ).length;
   const schoolOptions = useMemo(() => {
     const visibleSchools = listSchool.slice(0, visibleSchoolCount);
@@ -667,7 +745,15 @@ export default function StudentReportPage() {
       .map((school) => ({
         ...school,
         label: (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              width: "100%",
+            }}
+          >
             <span>{school.label}</span>
             <button
               type="button"
@@ -717,13 +803,24 @@ export default function StudentReportPage() {
 
     return [
       ...(recentSchools.length > 0
-        ? [{ label: "Recently used", title: true, disabled: true }, ...recentSchools]
+        ? [
+            { label: "Recently used", title: true, disabled: true },
+            ...recentSchools,
+          ]
         : []),
       ...(otherSchools.length > 0
-        ? [{ label: "All schools", title: true, disabled: true }, ...otherSchools]
+        ? [
+            { label: "All schools", title: true, disabled: true },
+            ...otherSchools,
+          ]
         : []),
     ];
-  }, [handleRemoveRecentSchool, listSchool, recentSchoolIds, visibleSchoolCount]);
+  }, [
+    handleRemoveRecentSchool,
+    listSchool,
+    recentSchoolIds,
+    visibleSchoolCount,
+  ]);
   const activeFilterCount = [
     Boolean(keyword?.trim()),
     filters.school !== undefined,
@@ -738,14 +835,18 @@ export default function StudentReportPage() {
       <div className="page-hero">
         <div>
           <p className="hero-eyebrow">🌸 Student evaluation dashboard</p>
-          <p className="hero-copyright">Copyright © <span style={{ color: '#f8a5c2' }}>Diggory Dinh</span> with love</p>
+          <p className="hero-copyright">
+            Copyright © <span style={{ color: "#f8a5c2" }}>Diggory Dinh</span>{" "}
+            with love
+          </p>
           <h1>Follow every student’s progress with a calm, clear view.</h1>
-
         </div>
         <div className="hero-badge">
           <span>✨ {visibleCount} visible</span>
           <span>✅ {strongResultCount} good results</span>
-          <span>🏫 {new Set(listStudent.map((x) => x.school_id)).size} schools</span>
+          <span>
+            🏫 {new Set(listStudent.map((x) => x.school_id)).size} schools
+          </span>
         </div>
       </div>
 
@@ -756,7 +857,9 @@ export default function StudentReportPage() {
               <TeamOutlined />
             </div>
             <Statistic title="Total Students" value={pagination.total} />
-            <p className="stat-card__text">Students currently visible in the report</p>
+            <p className="stat-card__text">
+              Students currently visible in the report
+            </p>
           </Card>
         </Col>
 
@@ -769,7 +872,9 @@ export default function StudentReportPage() {
               title="Schools"
               value={new Set(listStudent.map((x) => x.school_id)).size}
             />
-            <p className="stat-card__text">Different schools included in the dataset</p>
+            <p className="stat-card__text">
+              Different schools included in the dataset
+            </p>
           </Card>
         </Col>
 
@@ -779,7 +884,9 @@ export default function StudentReportPage() {
               <TrophyOutlined />
             </div>
             <Statistic title="Reports" value={listStudent.length} />
-            <p className="stat-card__text">Performance summaries ready to review</p>
+            <p className="stat-card__text">
+              Performance summaries ready to review
+            </p>
           </Card>
         </Col>
       </Row>
@@ -790,9 +897,18 @@ export default function StudentReportPage() {
             <div className="table-toolbar">
               <div>
                 <h3>Danh sách học sinh</h3>
-
               </div>
+
               <div className="toolbar-actions">
+                <Button
+                  type="primary"
+                  ghost
+                  loading={exporting}
+                  disabled={!selectedRows.length}
+                  onClick={handleExportVideos}
+                >
+                  Export Videos ({selectedRows.length})
+                </Button>
                 <div className="toolbar-btn-wrapper">
                   <Button
                     type="primary"
@@ -831,7 +947,9 @@ export default function StudentReportPage() {
                   onPopupScroll={handleSchoolPopupScroll}
                   filterOption={(input, option) => {
                     const searchText = option?.data?.searchText ?? "";
-                    return searchText.toLowerCase().includes(input.toLowerCase());
+                    return searchText
+                      .toLowerCase()
+                      .includes(input.toLowerCase());
                   }}
                 />
               </Col>
@@ -846,12 +964,14 @@ export default function StudentReportPage() {
                   onChange={(e) => setKeyword(e.target.value)}
                 />
               </Col>
-
             </Row>
 
             <Table
+              rowSelection={rowSelection}
               loading={loading}
-              rowKey={(record) => `${record.student_id}-${record.game_lesson_id}`}
+              rowKey={(record) =>
+                `${record.student_id}-${record.game_lesson_id}`
+              }
               columns={columns}
               dataSource={filteredStudentsMulti}
               scroll={{ x: 1400 }}
@@ -895,8 +1015,14 @@ export default function StudentReportPage() {
                           callbacks: {
                             label: (context) => {
                               const value = context.raw;
-                              const total = context.dataset.data.reduce((acc, item) => acc + item, 0);
-                              const percent = total > 0 ? ((value / total) * 100).toFixed(2) : "0.00";
+                              const total = context.dataset.data.reduce(
+                                (acc, item) => acc + item,
+                                0,
+                              );
+                              const percent =
+                                total > 0
+                                  ? ((value / total) * 100).toFixed(2)
+                                  : "0.00";
                               return `${context.label}: ${value} (${percent}%)`;
                             },
                           },
@@ -962,8 +1088,14 @@ export default function StudentReportPage() {
                           callbacks: {
                             label: (context) => {
                               const value = context.raw;
-                              const total = context.dataset.data.reduce((acc, item) => acc + item, 0);
-                              const percent = total > 0 ? ((value / total) * 100).toFixed(2) : "0.00";
+                              const total = context.dataset.data.reduce(
+                                (acc, item) => acc + item,
+                                0,
+                              );
+                              const percent =
+                                total > 0
+                                  ? ((value / total) * 100).toFixed(2)
+                                  : "0.00";
                               return `${context.label}: ${value} (${percent}%)`;
                             },
                           },
@@ -1005,8 +1137,14 @@ export default function StudentReportPage() {
                           callbacks: {
                             label: (context) => {
                               const value = context.raw;
-                              const total = context.dataset.data.reduce((acc, item) => acc + item, 0);
-                              const percent = total > 0 ? ((value / total) * 100).toFixed(2) : "0.00";
+                              const total = context.dataset.data.reduce(
+                                (acc, item) => acc + item,
+                                0,
+                              );
+                              const percent =
+                                total > 0
+                                  ? ((value / total) * 100).toFixed(2)
+                                  : "0.00";
                               return `${context.label}: ${value} (${percent}%)`;
                             },
                           },
@@ -1051,7 +1189,6 @@ export default function StudentReportPage() {
         }
       >
         <Form layout="vertical">
-
           <Form.Item label="Class">
             <Select
               allowClear
