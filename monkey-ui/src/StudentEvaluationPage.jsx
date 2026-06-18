@@ -48,10 +48,17 @@ ChartJS.register(
   Legend,
 );
 const { Search } = Input;
+import { message } from "antd";
 
 const SCHOOL_CACHE_KEY = "monkey-school-list-cache";
 const SCHOOL_RECENT_KEY = "monkey-school-recent-cache";
 const SCHOOL_CACHE_TTL = 1000 * 60 * 60 * 24 * 7;
+
+message.loading({
+  content: "Đang nén video...",
+  key: "export",
+  duration: 0,
+});
 
 function getCachedSchools() {
   try {
@@ -209,6 +216,7 @@ export default function StudentReportPage() {
 
   const handleExportVideos = async () => {
     if (!selectedRows.length) {
+      message.warning("Vui lòng chọn ít nhất 1 học sinh");
       return;
     }
 
@@ -228,7 +236,11 @@ export default function StudentReportPage() {
         },
       );
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blob = new Blob([response.data], {
+        type: "application/zip",
+      });
+
+      const url = window.URL.createObjectURL(blob);
 
       const link = document.createElement("a");
 
@@ -236,12 +248,18 @@ export default function StudentReportPage() {
       link.download = `videos-${Date.now()}.zip`;
 
       document.body.appendChild(link);
+
       link.click();
 
       link.remove();
+
       window.URL.revokeObjectURL(url);
+
+      message.success(`Xuất thành công ${selectedRows.length} video`);
     } catch (error) {
       console.error(error);
+
+      message.error("Xuất video thất bại");
     } finally {
       setExporting(false);
     }
@@ -646,11 +664,14 @@ export default function StudentReportPage() {
       title: "Video",
       dataIndex: "video",
       width: 120,
-      render: (url) => (
-        <a href={url} target="_blank" rel="noreferrer">
-          View Video
-        </a>
-      ),
+      render: (url) =>
+        url?.trim?.() ? (
+          <a href={url} target="_blank" rel="noreferrer">
+            View Video
+          </a>
+        ) : (
+          <Tag color="default">No Video</Tag>
+        ),
     },
   ];
 

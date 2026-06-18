@@ -1,5 +1,13 @@
 const express = require("express");
 const router = express.Router();
+const fs = require("fs");
+const archiver = require("archiver");
+
+// create a file to stream archive data to.
+const output = fs.createWriteStream(__dirname + "/example.zip");
+const archive = archiver("zip", {
+  zlib: { level: 9 }, // Sets the compression level.
+});
 
 const {
   getStatusList,
@@ -51,40 +59,43 @@ router.get("/school-list", async (req, res) => {
 });
 
 router.post("/export-videos", async (req, res) => {
-  const { students } = req.body;
+  try {
+    const { students } = req.body;
 
-  res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", 'attachment; filename="videos.zip"');
 
-  res.setHeader("Content-Disposition", 'attachment; filename="videos.zip"');
-
-  const archive = archiver("zip", {
-    zlib: { level: 9 },
-  });
-
-  archive.pipe(res);
-
-  const downloads = students.map(async (student) => {
-    if (!student.video) return null;
-
-    const response = await axios.get(student.video, {
-      responseType: "stream",
+    const archive = archiver("zip", {
+      zlib: { level: 9 },
     });
 
-    return {
-      stream: response.data,
-      name: `${student.student_name}.mp4`,
-    };
-  });
+    archive.pipe(res);
 
-  const files = await Promise.all(downloads);
+    for (const student of students) {
+      if (!student.video) continue;
 
-  files.filter(Boolean).forEach((file) => {
-    archive.append(file.stream, {
-      name: file.name,
+      try {
+        const response = await axios.get(student.video, {
+          responseType: "stream",
+        });
+
+        archive.append(response.data, {
+          name: `${student.student_name}.mp4`,
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    await archive.finalize();
+
+    console.log("ZIP generated");
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: err.message,
     });
-  });
-
-  await archive.finalize();
+  }
 });
 
 module.exports = router;
