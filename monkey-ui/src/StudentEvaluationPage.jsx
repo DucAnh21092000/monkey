@@ -340,16 +340,16 @@ const verdictColors = {
 
     return {
       labels: newLabel,
-      datasets: [
-        {
-          data: Object.values(summary),
-          backgroundColor:    backgroundColor: keys.map(
+     datasets: [
+      {
+        data: Object.values(summary),
+        backgroundColor: keys.map(
           (key) => verdictColors[key] || "#d9d9d9"
-        ),,
-        },
-      ],
-    };
-  }, [filteredStudentsMulti]);
+        ),
+      },
+    ],
+  };
+}, [filteredStudentsMulti]);
 
   const reportChartData = useMemo(() => {
     const summary = {};
