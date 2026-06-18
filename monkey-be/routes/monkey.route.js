@@ -60,7 +60,7 @@ router.get("/school-list", async (req, res) => {
 
 router.post("/export-videos", async (req, res) => {
   try {
-    const { students } = req.body;
+    const { students = [] } = req.body;
 
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", 'attachment; filename="videos.zip"');
@@ -69,47 +69,46 @@ router.post("/export-videos", async (req, res) => {
       zlib: { level: 9 },
     });
 
+    archive.on("error", (err) => {
+      console.error("Archive error:", err);
+      res.status(500).end();
+    });
+
     archive.pipe(res);
 
     for (const student of students) {
-      if (!student.video) continue;
-
       try {
+        if (!student?.video) continue;
+
         const response = await axios.get(student.video, {
           responseType: "stream",
         });
 
+        const safeName = (student.student_name || "unknown")
+          .replace(/[<>:"/\\|?*]/g, "_")
+          .trim();
+
         archive.append(response.data, {
-          name: `${student.student_name}.mp4`,
+          name: `${safeName}.mp4`,
         });
       } catch (err) {
-        console.error(err);
+        console.error(
+          `Cannot download video of ${student.student_name}:`,
+          err.message,
+        );
       }
     }
 
     await archive.finalize();
-    archive.on("end", () => {
-      console.log("Archive data has been drained");
-    });
+  } catch (error) {
+    console.error("Export videos error:", error);
 
-    archive.on("finish", () => {
-      console.log("Archive finished");
-    });
-
-    res.on("finish", () => {
-      console.log("Response sent successfully");
-    });
-
-    res.on("close", () => {
-      console.log("Response closed");
-    });
-    console.log("ZIP generated");
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      message: err.message,
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
   }
 });
-
 module.exports = router;
