@@ -314,6 +314,13 @@ export default function StudentReportPage() {
     }
   };
 
+const verdictColors = {
+  1: "#BFC6C4",
+  2: "#F0FFC3",
+  3: "#A8DF8E",
+  4: "#FFA673",
+};
+  
   const chartData = useMemo(() => {
     const summary = {};
 
@@ -336,15 +343,9 @@ export default function StudentReportPage() {
       datasets: [
         {
           data: Object.values(summary),
-          backgroundColor: [
-            "#1677ff",
-            "#52c41a",
-            "#faad14",
-            "#ff4d4f",
-            "#722ed1",
-            "#13c2c2",
-            "#f59e0b",
-          ],
+          backgroundColor:    backgroundColor: keys.map(
+          (key) => verdictColors[key] || "#d9d9d9"
+        ),,
         },
       ],
     };
