@@ -216,12 +216,17 @@ export default function StudentReportPage() {
 
   const handleExportVideos = async () => {
     if (!selectedRows.length) {
-      message.warning("Vui lòng chọn ít nhất 1 học sinh");
+      message.warning("Vui lòng chọn ít nhất một học sinh");
       return;
     }
 
     try {
       setExporting(true);
+
+      const hide = message.loading(
+        `Đang xuất ${selectedRows.length} video...`,
+        0,
+      );
 
       const response = await axios.post(
         "https://monkey-1gz4.onrender.com/api/export-videos",
@@ -236,30 +241,37 @@ export default function StudentReportPage() {
         },
       );
 
+      hide();
+
+      if (!response.data || response.data.size === 0) {
+        throw new Error("File zip rỗng hoặc export thất bại");
+      }
+
       const blob = new Blob([response.data], {
         type: "application/zip",
       });
 
       const url = window.URL.createObjectURL(blob);
-
       const link = document.createElement("a");
 
       link.href = url;
       link.download = `videos-${Date.now()}.zip`;
 
       document.body.appendChild(link);
-
       link.click();
 
       link.remove();
-
       window.URL.revokeObjectURL(url);
 
-      message.success(`Xuất thành công ${selectedRows.length} video`);
+      message.success("Xuất video thành công 🎉");
     } catch (error) {
       console.error(error);
 
-      message.error("Xuất video thất bại");
+      message.error(
+        error?.response?.data?.message ||
+          error.message ||
+          "Xuất video thất bại",
+      );
     } finally {
       setExporting(false);
     }
