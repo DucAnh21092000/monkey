@@ -161,9 +161,9 @@ export default function StudentReportPage() {
 
   const defaultFilters = {
     school: undefined,
-    class: undefined,
-    report: undefined,
-    testResult: undefined,
+    class: [],
+    report: [],
+    testResult: [],
     studentName: undefined,
   };
 
@@ -216,13 +216,16 @@ export default function StudentReportPage() {
       const matchSchool =
         !filters.school || student.school_id === filters.school;
 
-      const matchClass = !filters.class || student.class_id === filters.class;
+      const matchClass =
+        filters.class.length === 0 || filters.class.includes(student.class_id);
 
       const matchReport =
-        !filters.report || student.report_name === filters.report;
+        filters.report.length === 0 ||
+        filters.report.includes(student.report_name);
 
       const matchTestResult =
-        !filters.testResult || student.verdict === filters.testResult;
+        filters.testResult.length === 0 ||
+        filters.testResult.includes(student.verdict);
 
       const matchStudentName =
         !filters.studentName ||
@@ -851,9 +854,9 @@ export default function StudentReportPage() {
   const activeFilterCount = [
     Boolean(keyword?.trim()),
     filters.school !== undefined,
-    filters.class !== undefined,
-    filters.report !== undefined,
-    filters.testResult !== undefined,
+    filters.class.length > 0,
+    filters.testResult.length > 0,
+    filters.report > 0,
     Boolean(filters.studentName?.trim()),
   ].filter(Boolean).length;
 
@@ -1216,7 +1219,10 @@ export default function StudentReportPage() {
         <Form layout="vertical">
           <Form.Item label="Class">
             <Select
+              mode="multiple"
+              maxTagCount="responsive"
               allowClear
+              placeholder="Chọn lớp"
               options={classFilters}
               value={draftFilters.class}
               onChange={(value) =>
@@ -1230,7 +1236,10 @@ export default function StudentReportPage() {
 
           <Form.Item label="Report">
             <Select
+              mode="multiple"
+              maxTagCount="responsive"
               allowClear
+              placeholder="Chọn report"
               options={reportOptions}
               value={draftFilters.report}
               onChange={(value) =>
@@ -1244,7 +1253,10 @@ export default function StudentReportPage() {
 
           <Form.Item label="Test Result">
             <Select
+              mode="multiple"
+              maxTagCount="responsive"
               allowClear
+              placeholder="Chọn kết quả"
               options={testResultFilters}
               value={draftFilters.testResult}
               onChange={(value) =>
