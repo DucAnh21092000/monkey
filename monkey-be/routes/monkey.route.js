@@ -88,7 +88,21 @@ router.post("/export-videos", async (req, res) => {
     }
 
     await archive.finalize();
+    archive.on("end", () => {
+      console.log("Archive data has been drained");
+    });
 
+    archive.on("finish", () => {
+      console.log("Archive finished");
+    });
+
+    res.on("finish", () => {
+      console.log("Response sent successfully");
+    });
+
+    res.on("close", () => {
+      console.log("Response closed");
+    });
     console.log("ZIP generated");
   } catch (err) {
     console.error(err);
