@@ -205,6 +205,42 @@ export default function StudentReportPage() {
     [],
   );
 
+  const filteredStudentsMulti = useMemo(() => {
+    return listStudent.filter((student) => {
+      const matchKeyword =
+        !deferredKeyword ||
+        student.student_name
+          ?.toLowerCase()
+          .includes(deferredKeyword.toLowerCase());
+
+      const matchSchool =
+        !filters.school || student.school_id === filters.school;
+
+      const matchClass = !filters.class || student.class_id === filters.class;
+
+      const matchReport =
+        !filters.report || student.report_name === filters.report;
+
+      const matchTestResult =
+        !filters.testResult || student.verdict === filters.testResult;
+
+      const matchStudentName =
+        !filters.studentName ||
+        student.student_name
+          ?.toLowerCase()
+          .includes(filters.studentName.toLowerCase());
+
+      return (
+        matchKeyword &&
+        matchSchool &&
+        matchClass &&
+        matchReport &&
+        matchTestResult &&
+        matchStudentName
+      );
+    });
+  }, [listStudent, deferredKeyword, filters]);
+
   const rowSelection = {
     selectedRowKeys,
 
@@ -280,7 +316,7 @@ export default function StudentReportPage() {
   const chartData = useMemo(() => {
     const summary = {};
 
-    listStudent.forEach((student) => {
+    filteredStudentsMulti.forEach((student) => {
       if (student.verdict) {
         const key = student.verdict;
         summary[key] = (summary[key] || 0) + 1;
@@ -311,12 +347,12 @@ export default function StudentReportPage() {
         },
       ],
     };
-  }, [listStudent]);
+  }, [filteredStudentsMulti]);
 
   const reportChartData = useMemo(() => {
     const summary = {};
 
-    listStudent.forEach((student) => {
+    filteredStudentsMulti.forEach((student) => {
       const key = student.report_name || "Unknown";
       summary[key] = (summary[key] || 0) + 1;
     });
@@ -351,12 +387,12 @@ export default function StudentReportPage() {
         },
       ],
     };
-  }, [listStudent]);
+  }, [filteredStudentsMulti]);
 
   const duplicateStudentChartData = useMemo(() => {
     const summary = {};
 
-    listStudent.forEach((student) => {
+    filteredStudentsMulti.forEach((student) => {
       const key = student.student_name || "Unknown";
       summary[key] = (summary[key] || 0) + 1;
     });
@@ -394,12 +430,14 @@ export default function StudentReportPage() {
         },
       ],
     };
-  }, [listStudent]);
+  }, [filteredStudentsMulti]);
 
   const reportAvailabilityChartData = useMemo(() => {
-    const withReport = listStudent.filter((student) => student.verdict).length;
-    const withoutReport = listStudent.length - withReport;
-    const total = listStudent.length || 1;
+    const withReport = filteredStudentsMulti.filter(
+      (student) => student.verdict,
+    ).length;
+    const withoutReport = filteredStudentsMulti.length - withReport;
+    const total = filteredStudentsMulti.length || 1;
 
     return {
       labels: [
@@ -416,7 +454,7 @@ export default function StudentReportPage() {
         },
       ],
     };
-  }, [listStudent]);
+  }, [filteredStudentsMulti]);
 
   useEffect(() => {
     let cancelled = false;
@@ -687,14 +725,6 @@ export default function StudentReportPage() {
     },
   ];
 
-  const handleTableChange = (paginationConfig) => {
-    fetchStudents(
-      selectedSchool,
-      paginationConfig.current,
-      paginationConfig.pageSize,
-    );
-  };
-
   const handleResetFilter = () => {
     setKeyword("");
     setFilters(defaultFilters);
@@ -729,42 +759,6 @@ export default function StudentReportPage() {
     },
     [listSchool.length, visibleSchoolCount],
   );
-
-  const filteredStudentsMulti = useMemo(() => {
-    return listStudent.filter((student) => {
-      const matchKeyword =
-        !deferredKeyword ||
-        student.student_name
-          ?.toLowerCase()
-          .includes(deferredKeyword.toLowerCase());
-
-      const matchSchool =
-        !filters.school || student.school_id === filters.school;
-
-      const matchClass = !filters.class || student.class_id === filters.class;
-
-      const matchReport =
-        !filters.report || student.report_name === filters.report;
-
-      const matchTestResult =
-        !filters.testResult || student.verdict === filters.testResult;
-
-      const matchStudentName =
-        !filters.studentName ||
-        student.student_name
-          ?.toLowerCase()
-          .includes(filters.studentName.toLowerCase());
-
-      return (
-        matchKeyword &&
-        matchSchool &&
-        matchClass &&
-        matchReport &&
-        matchTestResult &&
-        matchStudentName
-      );
-    });
-  }, [listStudent, deferredKeyword, filters]);
 
   const visibleCount = filteredStudentsMulti.length;
   const strongResultCount = filteredStudentsMulti.filter((student) =>
@@ -903,7 +897,9 @@ export default function StudentReportPage() {
             </div>
             <Statistic
               title="Schools"
-              value={new Set(listStudent.map((x) => x.school_id)).size}
+              value={
+                new Set(filteredStudentsMulti.map((x) => x.school_id)).size
+              }
             />
             <p className="stat-card__text">
               Different schools included in the dataset
@@ -916,7 +912,7 @@ export default function StudentReportPage() {
             <div className="stat-card__icon">
               <TrophyOutlined />
             </div>
-            <Statistic title="Reports" value={listStudent.length} />
+            <Statistic title="Reports" value={filteredStudentsMulti.length} />
             <p className="stat-card__text">
               Performance summaries ready to review
             </p>
@@ -1009,12 +1005,8 @@ export default function StudentReportPage() {
               dataSource={filteredStudentsMulti}
               scroll={{ x: 1400 }}
               tableLayout="fixed"
-              onChange={handleTableChange}
               className="student-table"
               pagination={{
-                current: pagination.current,
-                pageSize: pagination.pageSize,
-                total: pagination.total,
                 showSizeChanger: true,
                 pageSizeOptions: ["10", "20", "50", "100"],
                 showTotal: (total) => `Tổng ${total} học sinh`,
