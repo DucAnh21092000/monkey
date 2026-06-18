@@ -54,12 +54,6 @@ const SCHOOL_CACHE_KEY = "monkey-school-list-cache";
 const SCHOOL_RECENT_KEY = "monkey-school-recent-cache";
 const SCHOOL_CACHE_TTL = 1000 * 60 * 60 * 24 * 7;
 
-message.loading({
-  content: "Đang nén video...",
-  key: "export",
-  duration: 0,
-});
-
 function getCachedSchools() {
   try {
     const cached = localStorage.getItem(SCHOOL_CACHE_KEY);
@@ -281,7 +275,11 @@ export default function StudentReportPage() {
       );
 
       hide();
-
+      message.loading({
+        content: "Đang nén video...",
+        key: "export",
+        duration: 0,
+      });
       if (!response.data || response.data.size === 0) {
         throw new Error("File zip rỗng hoặc export thất bại");
       }
