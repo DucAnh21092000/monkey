@@ -337,7 +337,7 @@ const verdictColors = {
       const percent = total > 0 ? ((count / total) * 100).toFixed(2) : "0.00";
       return `${resultMap[key]?.label || key} (${count}) - ${percent}%`;
     });
-
+const keys = Object.keys(summary);
     return {
       labels: newLabel,
      datasets: [
