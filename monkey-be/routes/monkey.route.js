@@ -1,6 +1,16 @@
 const express = require("express");
 const router = express.Router();
 
+const axios = require("axios");
+const fs = require("fs")
+const { ZipArchive } = require("archiver")
+
+// create a file to stream archive data to.
+const output = fs.createWriteStream(__dirname + "/example.zip");
+const archive = new ZipArchive({
+  zlib: { level: 9 }, // Sets the compression level.
+});
+
 const {
   getStatusList,
   getFilters,
@@ -11,7 +21,7 @@ router.get("/status-list", async (req, res) => {
   const { school_id, page, pageSize } = req.query;
   try {
     const data = await getStatusList(school_id, page, pageSize);
-
+    console.log("data", data);
     res.json(data);
   } catch (err) {
     res.status(500).json({
@@ -51,40 +61,79 @@ router.get("/school-list", async (req, res) => {
 });
 
 router.post("/export-videos", async (req, res) => {
-  const { students } = req.body;
+  try {
+    const { students = [] } = req.body;
 
-  res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="videos.zip"'
+    );
 
-  res.setHeader("Content-Disposition", 'attachment; filename="videos.zip"');
-
-  const archive = archiver("zip", {
-    zlib: { level: 9 },
-  });
-
-  archive.pipe(res);
-
-  const downloads = students.map(async (student) => {
-    if (!student.video) return null;
-
-    const response = await axios.get(student.video, {
-      responseType: "stream",
+    const archive = new ZipArchive({
+      zlib: { level: 9 },
     });
 
-    return {
-      stream: response.data,
-      name: `${student.student_name}.mp4`,
-    };
-  });
+    archive.on("error", (err) => {
+      console.error("Archive error:", err);
 
-  const files = await Promise.all(downloads);
-
-  files.filter(Boolean).forEach((file) => {
-    archive.append(file.stream, {
-      name: file.name,
+      if (!res.headersSent) {
+        res.status(500).end();
+      }
     });
-  });
 
-  await archive.finalize();
+    archive.pipe(res);
+
+    for (const student of students) {
+      try {
+        if (!student?.video) continue;
+
+        const response = await axios.get(student.video, {
+          responseType: "stream",
+        });
+
+        const safeName =
+          (student.student_name || "unknown")
+            .replace(/[<>:"/\\|?*]/g, "_")
+            .trim();
+
+        archive.append(response.data, {
+          name: `${safeName}.mp4`,
+        });
+      } catch (err) {
+        console.error(
+          `Cannot download video of ${student.student_name}:`,
+          err.message
+        );
+      }
+    }
+
+    await archive.finalize();
+    archive.on("end", () => {
+      console.log("Archive data has been drained");
+    });
+
+    archive.on("finish", () => {
+      console.log("Archive finished");
+    });
+
+    res.on("finish", () => {
+      console.log("Response sent successfully");
+    });
+
+    res.on("close", () => {
+      console.log("Response closed");
+    });
+    
+  } catch (error) {
+    console.error("Export videos error:", error);
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
 });
-
 module.exports = router;

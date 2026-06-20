@@ -150,7 +150,6 @@ export default function StudentReportPage() {
     getRecentSchoolIds(),
   );
   const [pendingRecentSchool, setPendingRecentSchool] = useState();
-  const [visibleSchoolCount, setVisibleSchoolCount] = useState(60);
 
   const defaultFilters = {
     school: undefined,
@@ -173,7 +172,7 @@ export default function StudentReportPage() {
         setLoading(true);
 
         const response = await axios.get(
-          "https://monkey-1gz4.onrender.com/api/status-list",
+          "http://localhost:3000/api/status-list",
           {
             params: {
               school_id: schoolId,
@@ -214,9 +213,10 @@ export default function StudentReportPage() {
 
     try {
       setExporting(true);
+      console.log("Bắt đầu export videos...");
 
       const response = await axios.post(
-        "https://monkey-1gz4.onrender.com/api/export-videos",
+        "http://localhost:3000/api/export-videos",
         {
           students: selectedRows.map((item) => ({
             student_name: item.student_name,
@@ -225,11 +225,18 @@ export default function StudentReportPage() {
         },
         {
           responseType: "blob",
-        },
+        }
       );
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      if (!response.data || response.data.size === 0) {
+        throw new Error("File zip rỗng hoặc export thất bại");
+      }
 
+      const blob = new Blob([response.data], {
+        type: "application/zip",
+      });
+
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
 
       link.href = url;
@@ -240,8 +247,12 @@ export default function StudentReportPage() {
 
       link.remove();
       window.URL.revokeObjectURL(url);
+
+      console.log("Tải file zip thành công");
+      alert("Tải file zip thành công!");
     } catch (error) {
-      console.error(error);
+      console.error("Export videos error:", error);
+      alert("Tải file thất bại!");
     } finally {
       setExporting(false);
     }
@@ -341,12 +352,12 @@ export default function StudentReportPage() {
     );
     const labels = duplicates.length
       ? duplicates.map(([name, count]) => {
-          const percent =
-            totalDuplicates > 0
-              ? ((count / totalDuplicates) * 100).toFixed(2)
-              : "0.00";
-          return `${name} (${count}) - ${percent}%`;
-        })
+        const percent =
+          totalDuplicates > 0
+            ? ((count / totalDuplicates) * 100).toFixed(2)
+            : "0.00";
+        return `${name} (${count}) - ${percent}%`;
+      })
       : ["No duplicates"];
     const values = duplicates.length
       ? duplicates.map(([, count]) => count)
@@ -682,20 +693,7 @@ export default function StudentReportPage() {
     [recentSchoolIds],
   );
 
-  const handleSchoolPopupScroll = useCallback(
-    (event) => {
-      const target = event.target;
-      const reachedBottom =
-        target.scrollTop + target.clientHeight >= target.scrollHeight - 24;
 
-      if (reachedBottom && visibleSchoolCount < listSchool.length) {
-        setVisibleSchoolCount((current) =>
-          Math.min(current + 30, listSchool.length),
-        );
-      }
-    },
-    [listSchool.length, visibleSchoolCount],
-  );
 
   const filteredStudentsMulti = useMemo(() => {
     return listStudent.filter((student) => {
@@ -738,9 +736,8 @@ export default function StudentReportPage() {
     [2, 3, 4].includes(student.verdict),
   ).length;
   const schoolOptions = useMemo(() => {
-    const visibleSchools = listSchool.slice(0, visibleSchoolCount);
 
-    const recentSchools = visibleSchools
+    const recentSchools = listSchool
       .filter((school) => recentSchoolIds.includes(school.value))
       .map((school) => ({
         ...school,
@@ -789,7 +786,7 @@ export default function StudentReportPage() {
           searchText: String(school.label ?? ""),
         },
       }));
-    const otherSchools = visibleSchools
+    const otherSchools = listSchool
       .filter((school) => !recentSchoolIds.includes(school.value))
       .map((school) => ({
         ...school,
@@ -804,22 +801,21 @@ export default function StudentReportPage() {
     return [
       ...(recentSchools.length > 0
         ? [
-            { label: "Recently used", title: true, disabled: true },
-            ...recentSchools,
-          ]
+          { label: "Recently used", title: true, disabled: true },
+          ...recentSchools,
+        ]
         : []),
       ...(otherSchools.length > 0
         ? [
-            { label: "All schools", title: true, disabled: true },
-            ...otherSchools,
-          ]
+          { label: "All schools", title: true, disabled: true },
+          ...otherSchools,
+        ]
         : []),
     ];
   }, [
     handleRemoveRecentSchool,
     listSchool,
     recentSchoolIds,
-    visibleSchoolCount,
   ]);
   const activeFilterCount = [
     Boolean(keyword?.trim()),
@@ -944,9 +940,9 @@ export default function StudentReportPage() {
                   value={selectedSchool}
                   onChange={handleSchoolChange}
                   onDropdownVisibleChange={handleSchoolDropdownVisibleChange}
-                  onPopupScroll={handleSchoolPopupScroll}
                   filterOption={(input, option) => {
                     const searchText = option?.data?.searchText ?? "";
+
                     return searchText
                       .toLowerCase()
                       .includes(input.toLowerCase());
