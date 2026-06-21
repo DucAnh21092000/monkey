@@ -48,6 +48,7 @@ ChartJS.register(
   Legend,
 );
 const { Search } = Input;
+import { message } from "antd";
 
 const SCHOOL_CACHE_KEY = "monkey-school-list-cache";
 const SCHOOL_RECENT_KEY = "monkey-school-recent-cache";
@@ -153,9 +154,9 @@ export default function StudentReportPage() {
 
   const defaultFilters = {
     school: undefined,
-    class: undefined,
-    report: undefined,
-    testResult: undefined,
+    class: [],
+    report: [],
+    testResult: [],
     studentName: undefined,
   };
 
@@ -197,6 +198,45 @@ export default function StudentReportPage() {
     [],
   );
 
+  const filteredStudentsMulti = useMemo(() => {
+    return listStudent.filter((student) => {
+      const matchKeyword =
+        !deferredKeyword ||
+        student.student_name
+          ?.toLowerCase()
+          .includes(deferredKeyword.toLowerCase());
+
+      const matchSchool =
+        !filters.school || student.school_id === filters.school;
+
+      const matchClass =
+        filters.class.length === 0 || filters.class.includes(student.class_id);
+
+      const matchReport =
+        filters.report.length === 0 ||
+        filters.report.includes(student.report_name);
+
+      const matchTestResult =
+        filters.testResult.length === 0 ||
+        filters.testResult.includes(student.verdict);
+
+      const matchStudentName =
+        !filters.studentName ||
+        student.student_name
+          ?.toLowerCase()
+          .includes(filters.studentName.toLowerCase());
+
+      return (
+        matchKeyword &&
+        matchSchool &&
+        matchClass &&
+        matchReport &&
+        matchTestResult &&
+        matchStudentName
+      );
+    });
+  }, [listStudent, deferredKeyword, filters]);
+
   const rowSelection = {
     selectedRowKeys,
 
@@ -208,12 +248,17 @@ export default function StudentReportPage() {
 
   const handleExportVideos = async () => {
     if (!selectedRows.length) {
+      message.warning("Vui lòng chọn ít nhất một học sinh");
       return;
     }
 
     try {
       setExporting(true);
-      console.log("Bắt đầu export videos...");
+
+      const hide = message.loading(
+        `Đang xuất ${selectedRows.length} video...`,
+        0,
+      );
 
       const response = await axios.post(
         "http://localhost:3000/api/export-videos",
@@ -228,6 +273,12 @@ export default function StudentReportPage() {
         }
       );
 
+      hide();
+      message.loading({
+        content: "Đang nén video...",
+        key: "export",
+        duration: 0,
+      });
       if (!response.data || response.data.size === 0) {
         throw new Error("File zip rỗng hoặc export thất bại");
       }
@@ -248,20 +299,31 @@ export default function StudentReportPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
 
-      console.log("Tải file zip thành công");
-      alert("Tải file zip thành công!");
+      message.success("Xuất video thành công 🎉");
     } catch (error) {
-      console.error("Export videos error:", error);
-      alert("Tải file thất bại!");
+      console.error(error);
+
+      message.error(
+        error?.response?.data?.message ||
+          error.message ||
+          "Xuất video thất bại",
+      );
     } finally {
       setExporting(false);
     }
   };
 
+const verdictColors = {
+  1: "#BFC6C4",
+  2: "#F0FFC3",
+  3: "#A8DF8E",
+  4: "#FFA673",
+};
+  
   const chartData = useMemo(() => {
     const summary = {};
 
-    listStudent.forEach((student) => {
+    filteredStudentsMulti.forEach((student) => {
       if (student.verdict) {
         const key = student.verdict;
         summary[key] = (summary[key] || 0) + 1;
@@ -274,30 +336,24 @@ export default function StudentReportPage() {
       const percent = total > 0 ? ((count / total) * 100).toFixed(2) : "0.00";
       return `${resultMap[key]?.label || key} (${count}) - ${percent}%`;
     });
-
+const keys = Object.keys(summary);
     return {
       labels: newLabel,
-      datasets: [
-        {
-          data: Object.values(summary),
-          backgroundColor: [
-            "#1677ff",
-            "#52c41a",
-            "#faad14",
-            "#ff4d4f",
-            "#722ed1",
-            "#13c2c2",
-            "#f59e0b",
-          ],
-        },
-      ],
-    };
-  }, [listStudent]);
+     datasets: [
+      {
+        data: Object.values(summary),
+        backgroundColor: keys.map(
+          (key) => verdictColors[key] || "#d9d9d9"
+        ),
+      },
+    ],
+  };
+}, [filteredStudentsMulti]);
 
   const reportChartData = useMemo(() => {
     const summary = {};
 
-    listStudent.forEach((student) => {
+    filteredStudentsMulti.forEach((student) => {
       const key = student.report_name || "Unknown";
       summary[key] = (summary[key] || 0) + 1;
     });
@@ -332,12 +388,12 @@ export default function StudentReportPage() {
         },
       ],
     };
-  }, [listStudent]);
+  }, [filteredStudentsMulti]);
 
   const duplicateStudentChartData = useMemo(() => {
     const summary = {};
 
-    listStudent.forEach((student) => {
+    filteredStudentsMulti.forEach((student) => {
       const key = student.student_name || "Unknown";
       summary[key] = (summary[key] || 0) + 1;
     });
@@ -375,12 +431,14 @@ export default function StudentReportPage() {
         },
       ],
     };
-  }, [listStudent]);
+  }, [filteredStudentsMulti]);
 
   const reportAvailabilityChartData = useMemo(() => {
-    const withReport = listStudent.filter((student) => student.verdict).length;
-    const withoutReport = listStudent.length - withReport;
-    const total = listStudent.length || 1;
+    const withReport = filteredStudentsMulti.filter(
+      (student) => student.verdict,
+    ).length;
+    const withoutReport = filteredStudentsMulti.length - withReport;
+    const total = filteredStudentsMulti.length || 1;
 
     return {
       labels: [
@@ -397,7 +455,7 @@ export default function StudentReportPage() {
         },
       ],
     };
-  }, [listStudent]);
+  }, [filteredStudentsMulti]);
 
   useEffect(() => {
     let cancelled = false;
@@ -657,21 +715,16 @@ export default function StudentReportPage() {
       title: "Video",
       dataIndex: "video",
       width: 120,
-      render: (url) => (
-        <a href={url} target="_blank" rel="noreferrer">
-          View Video
-        </a>
-      ),
+      render: (url) =>
+        url?.trim?.() ? (
+          <a href={url} target="_blank" rel="noreferrer">
+            View Video
+          </a>
+        ) : (
+          <Tag color="default">No Video</Tag>
+        ),
     },
   ];
-
-  const handleTableChange = (paginationConfig) => {
-    fetchStudents(
-      selectedSchool,
-      paginationConfig.current,
-      paginationConfig.pageSize,
-    );
-  };
 
   const handleResetFilter = () => {
     setKeyword("");
@@ -820,9 +873,9 @@ export default function StudentReportPage() {
   const activeFilterCount = [
     Boolean(keyword?.trim()),
     filters.school !== undefined,
-    filters.class !== undefined,
-    filters.report !== undefined,
-    filters.testResult !== undefined,
+    filters.class.length > 0,
+    filters.testResult.length > 0,
+    filters.report > 0,
     Boolean(filters.studentName?.trim()),
   ].filter(Boolean).length;
 
@@ -866,7 +919,9 @@ export default function StudentReportPage() {
             </div>
             <Statistic
               title="Schools"
-              value={new Set(listStudent.map((x) => x.school_id)).size}
+              value={
+                new Set(filteredStudentsMulti.map((x) => x.school_id)).size
+              }
             />
             <p className="stat-card__text">
               Different schools included in the dataset
@@ -879,7 +934,7 @@ export default function StudentReportPage() {
             <div className="stat-card__icon">
               <TrophyOutlined />
             </div>
-            <Statistic title="Reports" value={listStudent.length} />
+            <Statistic title="Reports" value={filteredStudentsMulti.length} />
             <p className="stat-card__text">
               Performance summaries ready to review
             </p>
@@ -972,12 +1027,8 @@ export default function StudentReportPage() {
               dataSource={filteredStudentsMulti}
               scroll={{ x: 1400 }}
               tableLayout="fixed"
-              onChange={handleTableChange}
               className="student-table"
               pagination={{
-                current: pagination.current,
-                pageSize: pagination.pageSize,
-                total: pagination.total,
                 showSizeChanger: true,
                 pageSizeOptions: ["10", "20", "50", "100"],
                 showTotal: (total) => `Tổng ${total} học sinh`,
@@ -1187,7 +1238,10 @@ export default function StudentReportPage() {
         <Form layout="vertical">
           <Form.Item label="Class">
             <Select
+              mode="multiple"
+              maxTagCount="responsive"
               allowClear
+              placeholder="Chọn lớp"
               options={classFilters}
               value={draftFilters.class}
               onChange={(value) =>
@@ -1201,7 +1255,10 @@ export default function StudentReportPage() {
 
           <Form.Item label="Report">
             <Select
+              mode="multiple"
+              maxTagCount="responsive"
               allowClear
+              placeholder="Chọn report"
               options={reportOptions}
               value={draftFilters.report}
               onChange={(value) =>
@@ -1215,7 +1272,10 @@ export default function StudentReportPage() {
 
           <Form.Item label="Test Result">
             <Select
+              mode="multiple"
+              maxTagCount="responsive"
               allowClear
+              placeholder="Chọn kết quả"
               options={testResultFilters}
               value={draftFilters.testResult}
               onChange={(value) =>

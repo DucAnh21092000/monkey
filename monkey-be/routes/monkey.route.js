@@ -1,4 +1,5 @@
 const express = require("express");
+const axios = require("axios");
 const router = express.Router();
 
 const axios = require("axios");
@@ -63,6 +64,8 @@ router.get("/school-list", async (req, res) => {
 router.post("/export-videos", async (req, res) => {
   try {
     const { students = [] } = req.body;
+  try {
+    const { students = [] } = req.body;
 
     res.setHeader("Content-Type", "application/zip");
     res.setHeader(
@@ -83,11 +86,18 @@ router.post("/export-videos", async (req, res) => {
     });
 
     archive.pipe(res);
+    archive.pipe(res);
 
     for (const student of students) {
       try {
         if (!student?.video) continue;
+    for (const student of students) {
+      try {
+        if (!student?.video) continue;
 
+        const response = await axios.get(student.video, {
+          responseType: "stream",
+        });
         const response = await axios.get(student.video, {
           responseType: "stream",
         });
