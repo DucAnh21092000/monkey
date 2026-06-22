@@ -137,6 +137,7 @@ function sortSchoolsByRecent(schools, recentIds = []) {
 
 export default function StudentReportPage() {
   const [selectedSchool, setSelectedSchool] = useState();
+  const [selectedSchoolName, setSelectedSchoolName] = useState("");
   const [keyword, setKeyword] = useState("");
   const deferredKeyword = useDeferredValue(keyword);
   const [listSchool, setListSchool] = useState([]);
@@ -173,7 +174,7 @@ export default function StudentReportPage() {
         setLoading(true);
 
         const response = await axios.get(
-          "http://localhost:3000/api/status-list",
+          "https://monkey-1gz4.onrender.com/api/status-list",
           {
             params: {
               school_id: schoolId,
@@ -255,13 +256,14 @@ export default function StudentReportPage() {
     try {
       setExporting(true);
 
-      const hide = message.loading(
-        `Đang xuất ${selectedRows.length} video...`,
-        0,
-      );
+      message.loading({
+        content: `Đang xuất ${selectedRows.length} video...`,
+        key: "export",
+        duration: 0,
+      });
 
       const response = await axios.post(
-        "http://localhost:3000/api/export-videos",
+        "https://monkey-1gz4.onrender.com/api/export-videos",
         {
           students: selectedRows.map((item) => ({
             student_name: item.student_name,
@@ -270,15 +272,16 @@ export default function StudentReportPage() {
         },
         {
           responseType: "blob",
+          timeout: 0, // file lớn không timeout
         }
       );
 
-      hide();
       message.loading({
-        content: "Đang nén video...",
+        content: "Đang tạo file ZIP...",
         key: "export",
         duration: 0,
       });
+
       if (!response.data || response.data.size === 0) {
         throw new Error("File zip rỗng hoặc export thất bại");
       }
@@ -288,38 +291,50 @@ export default function StudentReportPage() {
       });
 
       const url = window.URL.createObjectURL(blob);
+
       const link = document.createElement("a");
-
       link.href = url;
-      link.download = `videos-${Date.now()}.zip`;
-
+      link.download = `${selectedSchoolName}.zip`;
       document.body.appendChild(link);
       link.click();
 
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
 
-      message.success("Xuất video thành công 🎉");
+      // đợi chút rồi mới revoke
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
+
+      message.success({
+        content: "Xuất video thành công 🎉",
+        key: "export",
+        duration: 2,
+      });
+      setSelectedRowKeys([]);
+      setSelectedRows([]);
+      setPagination((prev) => ({ ...prev, current: 1 }));
     } catch (error) {
-      console.error(error);
 
-      message.error(
-        error?.response?.data?.message ||
+      message.error({
+        content:
+          error?.response?.data?.message ||
           error.message ||
           "Xuất video thất bại",
-      );
+        key: "export",
+        duration: 3,
+      });
     } finally {
       setExporting(false);
     }
   };
 
-const verdictColors = {
-  1: "#BFC6C4",
-  2: "#F0FFC3",
-  3: "#A8DF8E",
-  4: "#FFA673",
-};
-  
+  const verdictColors = {
+    1: "#CBD5E1", // Need Improvement
+    2: "#FCD34D", // Good
+    3: "#4ADE80", // Very Good
+    4: "#16A34A", // Excellent
+  };
+
   const chartData = useMemo(() => {
     const summary = {};
 
@@ -336,19 +351,19 @@ const verdictColors = {
       const percent = total > 0 ? ((count / total) * 100).toFixed(2) : "0.00";
       return `${resultMap[key]?.label || key} (${count}) - ${percent}%`;
     });
-const keys = Object.keys(summary);
+    const keys = Object.keys(summary);
     return {
       labels: newLabel,
-     datasets: [
-      {
-        data: Object.values(summary),
-        backgroundColor: keys.map(
-          (key) => verdictColors[key] || "#d9d9d9"
-        ),
-      },
-    ],
-  };
-}, [filteredStudentsMulti]);
+      datasets: [
+        {
+          data: Object.values(summary),
+          backgroundColor: keys.map(
+            (key) => verdictColors[key] || "#d9d9d9"
+          ),
+        },
+      ],
+    };
+  }, [filteredStudentsMulti]);
 
   const reportChartData = useMemo(() => {
     const summary = {};
@@ -512,7 +527,8 @@ const keys = Object.keys(summary);
     return () => window.clearTimeout(timer);
   }, [selectedSchool, pagination.pageSize, fetchStudents]);
 
-  const handleSchoolChange = (value) => {
+  const handleSchoolChange = (value, option) => {
+    setSelectedSchoolName(option?.school_name ?? "");
     setSelectedSchool(value);
     setPendingRecentSchool(value || undefined);
   };
@@ -747,42 +763,6 @@ const keys = Object.keys(summary);
   );
 
 
-
-  const filteredStudentsMulti = useMemo(() => {
-    return listStudent.filter((student) => {
-      const matchKeyword =
-        !deferredKeyword ||
-        student.student_name
-          ?.toLowerCase()
-          .includes(deferredKeyword.toLowerCase());
-
-      const matchSchool =
-        !filters.school || student.school_id === filters.school;
-
-      const matchClass = !filters.class || student.class_id === filters.class;
-
-      const matchReport =
-        !filters.report || student.report_name === filters.report;
-
-      const matchTestResult =
-        !filters.testResult || student.verdict === filters.testResult;
-
-      const matchStudentName =
-        !filters.studentName ||
-        student.student_name
-          ?.toLowerCase()
-          .includes(filters.studentName.toLowerCase());
-
-      return (
-        matchKeyword &&
-        matchSchool &&
-        matchClass &&
-        matchReport &&
-        matchTestResult &&
-        matchStudentName
-      );
-    });
-  }, [listStudent, deferredKeyword, filters]);
 
   const visibleCount = filteredStudentsMulti.length;
   const strongResultCount = filteredStudentsMulti.filter((student) =>
