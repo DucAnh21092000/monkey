@@ -60,6 +60,8 @@ router.get("/school-list", async (req, res) => {
   }
 });
 
+const { finished } = require("stream/promises");
+
 router.post("/export-videos", async (req, res) => {
   try {
     const { students = [] } = req.body;
@@ -67,7 +69,7 @@ router.post("/export-videos", async (req, res) => {
     if (!students.length) {
       return res.status(400).json({
         success: false,
-        message: "Không có học sinh",
+        message: "Không có học sinh nào được chọn",
       });
     }
 
@@ -82,75 +84,76 @@ router.post("/export-videos", async (req, res) => {
 
     const archive = archiver("zip", {
       forceZip64: true,
-      zlib: { level: 0 },
+      zlib: {
+        level: 0, // video không cần nén
+      },
     });
 
     archive.pipe(res);
-archive.on("progress", (progress) => {
-  console.log(progress);
-});
 
-archive.on("finish", () => {
-  console.log("archive finish");
-});
+    archive.on("warning", console.warn);
 
-archive.on("end", () => {
-  console.log("archive end");
-});
-
-res.on("finish", () => {
-  console.log("response finish");
-});
-
-res.on("close", () => {
-  console.log("response close");
-});
     archive.on("error", (err) => {
-      console.error(err);
+      console.error("Archive error:", err);
       res.destroy(err);
     });
 
-    // Chỉ 2 stream cùng lúc
+    archive.on("progress", (progress) => {
+      console.log(progress);
+    });
+
+    archive.on("finish", () => {
+      console.log("ARCHIVE FINISH");
+    });
+
+    archive.on("close", () => {
+      console.log("ARCHIVE CLOSE");
+    });
+
+    res.on("finish", () => {
+      console.log("RESPONSE FINISH");
+    });
+
     const limit = pLimit(2);
 
-    const tasks = students.map((student, i) =>
-      limit(async () => {
-        if (!student.video) return;
-
-        try {
-          const response = await axios({
-            method: "GET",
-            url: student.video,
-            responseType: "stream",
-            timeout: 0,
-            decompress: false,
-            maxRedirects: 5,
-            httpAgent: new (require("http").Agent)({
-              keepAlive: true,
-            }),
-            httpsAgent: new (require("https").Agent)({
-              keepAlive: true,
-            }),
-          });
+    await Promise.all(
+      students.map((student, index) =>
+        limit(async () => {
+          if (!student.video) return;
 
           const safeName = (student.student_name || "unknown")
             .replace(/[<>:"/\\|?*]/g, "_")
             .trim();
 
-          archive.append(response.data, {
-            name: `${i + 1}-${safeName}.mp4`,
-          });
+          try {
+            const response = await axios({
+              url: student.video,
+              method: "GET",
+              responseType: "stream",
+              timeout: 0,
+              maxRedirects: 5,
+            });
 
-          console.log(`Added ${safeName}`);
-        } catch (err) {
-          console.log(`${student.student_name}: ${err.message}`);
-        }
-      })
+            archive.append(response.data, {
+              name: `${index + 1}-${safeName}.mp4`,
+            });
+
+            // đợi stream HTTP tải xong
+            await finished(response.data);
+
+            console.log(`✔ Finished ${safeName}`);
+          } catch (err) {
+            console.error(`${safeName}:`, err.message);
+          }
+        })
+      )
     );
 
-    await Promise.all(tasks);
+    console.log("All streams finished");
 
     await archive.finalize();
+
+    console.log("ZIP finalized");
   } catch (err) {
     console.error(err);
 
