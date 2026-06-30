@@ -174,7 +174,7 @@ export default function StudentReportPage() {
         setLoading(true);
 
         const response = await axios.get(
-          "https://monkey-1gz4.onrender.com/api/status-list",
+          "http://localhost:3000/api/status-list",
           {
             params: {
               school_id: schoolId,
@@ -263,7 +263,7 @@ export default function StudentReportPage() {
       });
 
       const response = await axios.post(
-        "https://monkey-1gz4.onrender.com/api/export-videos",
+        "http://localhost:3000/api/export-videos",
         {
           students: selectedRows.map((item) => ({
             student_name: item.student_name,
@@ -488,7 +488,7 @@ export default function StudentReportPage() {
     }
 
     axios
-      .get("https://monkey-1gz4.onrender.com/api/school-list")
+      .get("http://localhost:3000/api/school-list")
       .then((schoolResponse) => {
         if (cancelled) return;
 

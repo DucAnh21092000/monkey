@@ -21,7 +21,7 @@ router.get("/status-list", async (req, res) => {
   const { school_id, page, pageSize } = req.query;
   try {
     const data = await getStatusList(school_id, page, pageSize);
-    console.log("data", data);
+
     res.json(data);
   } catch (err) {
     res.status(500).json({

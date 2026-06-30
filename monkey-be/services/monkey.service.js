@@ -2,7 +2,7 @@ const axios = require("axios");
 const sharp = require("sharp");
 const Tesseract = require("tesseract.js");
 const pLimit = require("p-limit");
-
+const { createWorker, createScheduler } = require('tesseract.js');
 const limit = pLimit(3);
 
 const api = axios.create({
@@ -53,7 +53,63 @@ async function getImageBuffer(imageUrl) {
   return imageBuffer;
 }
 
-async function extractTestResult(imageUrl) {
+
+
+
+function checkTestResultClean(ocrText) {
+  if (!ocrText) return "";
+
+  // 1. Làm sạch text: chuyển chữ thường, chuẩn hóa khoảng trắng
+  const cleanText = ocrText.toLowerCase().replace(/\s+/g, ' ');
+
+  // 2. Regex bóc tách phần kết quả đứng sau cụm "kết quả bài test / test result"
+  // Chấp nhận các lỗi quét chữ l/t/1 như: test result, test resuttr, test resu1t...
+  const regex = /(?:kết\s*quả\s*bài\s*test\s*[\/\-]?\s*test\s*resu[lt1]t)[:\s-]*(.*)/i;
+  const match = cleanText.match(regex);
+
+  if (match && match[1]) {
+    const resultPart = match[1].trim();
+
+    // KIỂM TRA TRẠNG THÁI 1: Vượt trội - Excellent
+    if (resultPart.includes("vượt trội") || resultPart.includes("excellent")) {
+      return "Vượt trội - Excellent";
+    }
+
+    // KIỂM TRA TRẠNG THÁI 2: Rất tốt - Very good
+    if (resultPart.includes("rất tốt") || resultPart.includes("very good")) {
+      return "Rất tốt - Very good";
+    }
+
+    // KIỂM TRA TRẠNG THÁI 3: Cần cải thiện - Need Improvement
+    if (resultPart.includes("cần cải thiện") || resultPart.includes("need improvement")) {
+      return "Cần cải thiện - Need Improvement";
+    }
+
+    // KIỂM TRA TRẠNG THÁI 4: Đạt - Good
+    // Loại trừ trường hợp chứa "very good" vì "very good" cũng có chữ "good"
+    if (resultPart.includes("đạt") || (resultPart.includes("good") && !resultPart.includes("very good"))) {
+      return "Đạt - Good";
+    }
+  }
+
+  // 3. Phương án dự phòng: Nếu OCR quét thiếu cụm tiêu đề "Kết quả bài test" ở trước
+  if (cleanText.includes("vượt trội") || cleanText.includes("excellent")) {
+    return "Vượt trội - Excellent";
+  }
+  if (cleanText.includes("rất tốt") || cleanText.includes("very good")) {
+    return "Rất tốt - Very good";
+  }
+  if (cleanText.includes("cần cải thiện") || cleanText.includes("need improvement")) {
+    return "Cần cải thiện - Need Improvement";
+  }
+  if (cleanText.includes("đạt") || (cleanText.includes("good") && !cleanText.includes("very good"))) {
+    return "Đạt - Good";
+  }
+
+  return ""; // Không khớp bất kỳ trạng thái nào
+}
+
+async function extractTestResult(imageUrl, scheduler) {
   try {
     if (!imageUrl) return null;
 
@@ -61,59 +117,16 @@ async function extractTestResult(imageUrl) {
       return OCR_CACHE.get(imageUrl);
     }
 
-    const imageBuffer = await getImageBuffer(imageUrl);
+    let result = "";
 
-    const metadata = await sharp(imageBuffer).metadata();
-
-    const width = metadata.width;
-    const height = metadata.height;
-
-    /**
-     * Ảnh mẫu:
-     * Test result nằm khoảng 75~85% chiều cao ảnh
-     */
-
-    const cropBuffer = await sharp(imageBuffer)
-      .extract({
-        left: Math.floor(width * 0.45),
-        top: Math.floor(height * 0.72),
-        width: Math.floor(width * 0.45),
-        height: Math.floor(height * 0.15),
-      })
-      .grayscale()
-      .normalize()
-      .png()
-      .toBuffer();
-
-    const {
-      data: { text },
-    } = await Tesseract.recognize(cropBuffer, "eng", {
-      psm: 3,
-      oem: 1,
-      logger: () => { },
-    });
-
-    const lower = text.toLowerCase();
-
-    let result = null;
-
-    if (lower.includes("very good")) {
-      result = "Very good";
-    } else if (lower.includes("good")) {
-      result = "Good";
-    } else if (lower.includes("excellen")) {
-      result = "Excellent";
-    } else if (lower.includes("improv")) {
-      result = "Need improvement";
-    }
-
-
+    // Sử dụng scheduler.add thay vì worker.recognize
+    const ret = await scheduler.addJob('recognize', imageUrl);
+    const text = ret.data.text;
+    result = checkTestResultClean(text);
     setCacheValue(OCR_CACHE, imageUrl, result);
-
     return result;
   } catch (error) {
     console.error("OCR Error:", imageUrl, error.message);
-
     return null;
   }
 }
@@ -127,9 +140,40 @@ async function getStatusList(school_id) {
     },
   });
 
-  const records = data.data.data || [];
+  const records = data?.data?.data || [];
 
-  return data
+  // 1. Khởi tạo Scheduler và các Workers chạy song song
+  const scheduler = createScheduler();
+
+  // Tạo số lượng worker tùy thuộc vào cấu hình (Ví dụ: 4 workers chạy cùng lúc)
+  const CONCURRENT_WORKERS = 4;
+  for (let i = 0; i < CONCURRENT_WORKERS; i++) {
+    const worker = await createWorker('vie');
+    scheduler.addWorker(worker);
+  }
+
+  // 2. Chạy Promise.all thực sự song song nhờ Scheduler phân phối
+  const newData = await Promise.all(
+    records.map(async (item) => {
+      let testResultText = "";
+
+      if (item.image) {
+        // Truyền scheduler vào thay vì worker
+        testResultText = await extractTestResult(item.image, scheduler);
+      }
+
+      return {
+        ...item,
+        test_result: testResultText
+      };
+    })
+  );
+
+  // 3. Dọn dẹp scheduler (Nó sẽ tự terminate tất cả worker đã add vào)
+  await scheduler.terminate();
+
+  data.data.data = newData;
+  return data;
 }
 
 async function getFilters() {
