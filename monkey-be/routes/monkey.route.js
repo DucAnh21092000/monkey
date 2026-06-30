@@ -86,7 +86,25 @@ router.post("/export-videos", async (req, res) => {
     });
 
     archive.pipe(res);
+archive.on("progress", (progress) => {
+  console.log(progress);
+});
 
+archive.on("finish", () => {
+  console.log("archive finish");
+});
+
+archive.on("end", () => {
+  console.log("archive end");
+});
+
+res.on("finish", () => {
+  console.log("response finish");
+});
+
+res.on("close", () => {
+  console.log("response close");
+});
     archive.on("error", (err) => {
       console.error(err);
       res.destroy(err);
