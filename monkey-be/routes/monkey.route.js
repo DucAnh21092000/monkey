@@ -107,7 +107,7 @@ response.data.on("error", (err) => {
 });
 
 archive.append(response.data, {
-  name: `${i + 1}-${safeName}.mp4`,
+  name: `${i + 1}-${student.student_name}.mp4`,
 });
 
       } catch (err) {
