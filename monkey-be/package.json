@@ -20,7 +20,8 @@
     "https": "^1.0.0",
     "p-limit": "^3.1.0",
     "sharp": "^0.34.5",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "zip-stream": "^7.0.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
