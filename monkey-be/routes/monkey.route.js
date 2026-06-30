@@ -95,20 +95,20 @@ router.post("/export-videos", async (req, res) => {
       try {
         if (!student?.video) continue;
 
-        const response = await axios.get(student.video, {
-          responseType: "arraybuffer",
-          timeout: 0,
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-        });
+       const response = await axios.get(student.video, {
+  responseType: "stream",
+  timeout: 0,
+  maxContentLength: Infinity,
+  maxBodyLength: Infinity,
+});
 
-        const safeName = (student.student_name || "unknown")
-          .replace(/[<>:"/\\|?*]/g, "_")
-          .trim();
+response.data.on("error", (err) => {
+  console.error("Stream error:", err);
+});
 
-        archive.append(Buffer.from(response.data), {
-          name: `${i + 1}-${safeName}.mp4`,
-        });
+archive.append(response.data, {
+  name: `${i + 1}-${safeName}.mp4`,
+});
 
       } catch (err) {
         console.error(
