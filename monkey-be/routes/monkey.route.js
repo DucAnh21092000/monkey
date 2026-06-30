@@ -4,6 +4,13 @@ const pLimit = require("p-limit");
 const axios = require("axios");
 const fs = require("fs")
 const archiver = require("archiver");
+const EXPORT_DIR = "/tmp/exports";
+const exportJobs = {};
+const path = require("path");
+if (!fs.existsSync(EXPORT_DIR)) {
+  fs.mkdirSync(EXPORT_DIR, { recursive: true });
+}
+const { randomUUID } = require("crypto");
 
 // create a file to stream archive data to.
 const output = fs.createWriteStream(__dirname + "/example.zip");
@@ -28,6 +35,26 @@ router.get("/status-list", async (req, res) => {
       error: err.message,
     });
   }
+});
+
+router.get("/download/:file", (req, res) => {
+  const filePath = path.join(EXPORT_DIR, req.params.file);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({
+      success: false,
+      message: "File không tồn tại",
+    });
+  }
+
+  res.download(filePath, req.params.file, (err) => {
+    if (err) {
+      console.log(err);
+      return;
+    }
+
+    fs.unlink(filePath, () => { });
+  });
 });
 
 router.get("/filters", async (req, res) => {
@@ -62,107 +89,115 @@ router.get("/school-list", async (req, res) => {
 
 const { finished } = require("stream/promises");
 
+
+
 router.post("/export-videos", async (req, res) => {
-  try {
-    const { students = [] } = req.body;
+  const jobId = randomUUID();
 
-    if (!students.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Không có học sinh nào được chọn",
-      });
-    }
+  exportJobs[jobId] = {
+    status: "processing",
+    current: 0,
+    total: req.body.students?.length || 0,
+    percent: 0,
+    url: "",
+    error: "",
+  };
 
-    req.setTimeout(0);
-    res.setTimeout(0);
+  res.json({
+    success: true,
+    jobId,
+  });
 
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="videos-${Date.now()}.zip"`
-    );
-
-    const archive = archiver("zip", {
-      forceZip64: true,
-      zlib: {
-        level: 0, // video không cần nén
-      },
-    });
-
-    archive.pipe(res);
-
-    archive.on("warning", console.warn);
-
-    archive.on("error", (err) => {
-      console.error("Archive error:", err);
-      res.destroy(err);
-    });
-
-    archive.on("progress", (progress) => {
-      console.log(progress);
-    });
-
-    archive.on("finish", () => {
-      console.log("ARCHIVE FINISH");
-    });
-
-    archive.on("close", () => {
-      console.log("ARCHIVE CLOSE");
-    });
-
-    res.on("finish", () => {
-      console.log("RESPONSE FINISH");
-    });
-
-    const limit = pLimit(2);
-
-    await Promise.all(
-      students.map((student, index) =>
-        limit(async () => {
-          if (!student.video) return;
-
-          const safeName = (student.student_name || "unknown")
-            .replace(/[<>:"/\\|?*]/g, "_")
-            .trim();
-
-          try {
-            const response = await axios({
-              url: student.video,
-              method: "GET",
-              responseType: "stream",
-              timeout: 0,
-              maxRedirects: 5,
-            });
-
-            archive.append(response.data, {
-              name: `${index + 1}-${safeName}.mp4`,
-            });
-
-            // đợi stream HTTP tải xong
-            await finished(response.data);
-
-            console.log(`✔ Finished ${safeName}`);
-          } catch (err) {
-            console.error(`${safeName}:`, err.message);
-          }
-        })
-      )
-    );
-
-    console.log("All streams finished");
-
-    await archive.finalize();
-
-    console.log("ZIP finalized");
-  } catch (err) {
+  exportZip(jobId, req.body).catch((err) => {
     console.error(err);
 
-    if (!res.headersSent) {
-      res.status(500).json({
-        success: false,
-        message: err.message,
+    exportJobs[jobId].status = "failed";
+    exportJobs[jobId].error = err.message;
+  });
+});
+
+async function exportZip(jobId, body) {
+  const { students = [], fileName } = body;
+
+  const filePath = path.join(EXPORT_DIR, fileName);
+
+  const output = fs.createWriteStream(filePath);
+
+  const archive = archiver("zip", {
+    forceZip64: true,
+    zlib: {
+      level: 0,
+    },
+  });
+
+  archive.pipe(output);
+
+  for (let i = 0; i < students.length; i++) {
+    const student = students[i];
+
+    if (!student.video) continue;
+
+    const safeName = (student.student_name || "unknown")
+      .replace(/[<>:"/\\|?*]/g, "_")
+      .trim();
+
+    try {
+      const response = await axios({
+        method: "GET",
+        url: student.video,
+        responseType: "stream",
+        timeout: 0,
       });
+
+      archive.append(response.data, {
+        name: `${i + 1}-${safeName}.mp4`,
+      });
+
+      await new Promise((resolve, reject) => {
+        response.data.on("end", resolve);
+        response.data.on("error", reject);
+      });
+
+      exportJobs[jobId].current++;
+
+      exportJobs[jobId].percent = Math.round(
+        (exportJobs[jobId].current /
+          exportJobs[jobId].total) *
+        100
+      );
+
+      console.log(
+        `${exportJobs[jobId].current}/${exportJobs[jobId].total}`
+      );
+
+    } catch (err) {
+      console.log(err.message);
     }
   }
+
+  await archive.finalize();
+
+  await new Promise((resolve) => {
+    output.on("close", resolve);
+  });
+
+  exportJobs[jobId].status = "done";
+  exportJobs[jobId].url = `/download/${fileName}`;
+
+  console.log("DONE");
+}
+
+router.get("/export-progress/:jobId", (req, res) => {
+  const job = exportJobs[req.params.jobId];
+
+  if (!job) {
+    return res.status(404).json({
+      success: false,
+      message: "Job không tồn tại",
+    });
+  }
+
+  res.json(job);
 });
+
 module.exports = router;

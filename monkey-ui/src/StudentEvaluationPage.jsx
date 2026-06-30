@@ -174,7 +174,7 @@ export default function StudentReportPage() {
         setLoading(true);
 
         const response = await axios.get(
-          "http://localhost:3000/api/status-list",
+          "https://monkey-1gz4.onrender.com/api/status-list",
           {
             params: {
               school_id: schoolId,
@@ -257,64 +257,92 @@ export default function StudentReportPage() {
       setExporting(true);
 
       message.loading({
-        content: `Đang xuất ${selectedRows.length} video...`,
+        content: "Đang khởi tạo...",
         key: "export",
         duration: 0,
       });
 
-      const response = await axios.post(
-        "http://localhost:3000/api/export-videos",
+      const { data } = await axios.post(
+        "https://monkey-1gz4.onrender.com/api/export-videos",
         {
           students: selectedRows.map((item) => ({
             student_name: item.student_name,
             video: item.video,
           })),
+          fileName: `${selectedSchoolName}.zip`,
         },
         {
-          responseType: "blob",
-          timeout: 0, // file lớn không timeout
+          timeout: 0,
         }
       );
 
-      message.loading({
-        content: "Đang tạo file ZIP...",
-        key: "export",
-        duration: 0,
-      });
-
-      if (!response.data || response.data.size === 0) {
-        throw new Error("File zip rỗng hoặc export thất bại");
+      if (!data.success) {
+        throw new Error("Export thất bại");
       }
 
-      const blob = new Blob([response.data], {
-        type: "application/zip",
-      });
+      const jobId = data.jobId;
 
-      const url = window.URL.createObjectURL(blob);
+      // Theo dõi tiến độ
+      const timer = setInterval(async () => {
+        try {
+          const { data: progress } = await axios.get(
+            `https://monkey-1gz4.onrender.com/api/export-progress/${jobId}`
+          );
 
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${selectedSchoolName}.zip`;
-      document.body.appendChild(link);
-      link.click();
+          message.loading({
+            key: "export",
+            duration: 0,
+            content: `Đang xuất ${progress.current}/${progress.total} video (${progress.percent}%)`,
+          });
 
-      document.body.removeChild(link);
+          if (progress.status === "done") {
+            clearInterval(timer);
 
-      // đợi chút rồi mới revoke
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
+            message.success({
+              key: "export",
+              content: "Xuất thành công 🎉",
+              duration: 2,
+            });
+
+            // tải file
+            window.open(
+              `https://monkey-1gz4.onrender.com/api${progress.url}`,
+              "_blank"
+            );
+
+            setSelectedRowKeys([]);
+            setSelectedRows([]);
+            setPagination((prev) => ({
+              ...prev,
+              current: 1,
+            }));
+
+            setExporting(false);
+          }
+
+          if (progress.status === "failed") {
+            clearInterval(timer);
+
+            message.error({
+              key: "export",
+              content: progress.error || "Xuất thất bại",
+              duration: 3,
+            });
+
+            setExporting(false);
+          }
+        } catch (err) {
+          clearInterval(timer);
+
+          message.error({
+            key: "export",
+            content: "Không lấy được tiến độ export",
+          });
+
+          setExporting(false);
+        }
       }, 1000);
-
-      message.success({
-        content: "Xuất video thành công 🎉",
-        key: "export",
-        duration: 2,
-      });
-      setSelectedRowKeys([]);
-      setSelectedRows([]);
-      setPagination((prev) => ({ ...prev, current: 1 }));
     } catch (error) {
-
       message.error({
         content:
           error?.response?.data?.message ||
@@ -323,7 +351,7 @@ export default function StudentReportPage() {
         key: "export",
         duration: 3,
       });
-    } finally {
+
       setExporting(false);
     }
   };
@@ -488,7 +516,7 @@ export default function StudentReportPage() {
     }
 
     axios
-      .get("http://localhost:3000/api/school-list")
+      .get("https://monkey-1gz4.onrender.com/api/school-list")
       .then((schoolResponse) => {
         if (cancelled) return;
 

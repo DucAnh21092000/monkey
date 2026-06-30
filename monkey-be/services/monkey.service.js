@@ -140,39 +140,39 @@ async function getStatusList(school_id) {
     },
   });
 
-  const records = data?.data?.data || [];
+  // const records = data?.data?.data || [];
 
-  // 1. Khởi tạo Scheduler và các Workers chạy song song
-  const scheduler = createScheduler();
+  // // 1. Khởi tạo Scheduler và các Workers chạy song song
+  // const scheduler = createScheduler();
 
-  // Tạo số lượng worker tùy thuộc vào cấu hình (Ví dụ: 4 workers chạy cùng lúc)
-  const CONCURRENT_WORKERS = 4;
-  for (let i = 0; i < CONCURRENT_WORKERS; i++) {
-    const worker = await createWorker('vie');
-    scheduler.addWorker(worker);
-  }
+  // // Tạo số lượng worker tùy thuộc vào cấu hình (Ví dụ: 4 workers chạy cùng lúc)
+  // const CONCURRENT_WORKERS = 4;
+  // for (let i = 0; i < CONCURRENT_WORKERS; i++) {
+  //   const worker = await createWorker('vie');
+  //   scheduler.addWorker(worker);
+  // }
 
-  // 2. Chạy Promise.all thực sự song song nhờ Scheduler phân phối
-  const newData = await Promise.all(
-    records.map(async (item) => {
-      let testResultText = "";
+  // // 2. Chạy Promise.all thực sự song song nhờ Scheduler phân phối
+  // const newData = await Promise.all(
+  //   records.map(async (item) => {
+  //     let testResultText = "";
 
-      if (item.image) {
-        // Truyền scheduler vào thay vì worker
-        testResultText = await extractTestResult(item.image, scheduler);
-      }
+  //     if (item.image) {
+  //       // Truyền scheduler vào thay vì worker
+  //       testResultText = await extractTestResult(item.image, scheduler);
+  //     }
 
-      return {
-        ...item,
-        test_result: testResultText
-      };
-    })
-  );
+  //     return {
+  //       ...item,
+  //       test_result: testResultText
+  //     };
+  //   })
+  // );
 
-  // 3. Dọn dẹp scheduler (Nó sẽ tự terminate tất cả worker đã add vào)
-  await scheduler.terminate();
+  // // 3. Dọn dẹp scheduler (Nó sẽ tự terminate tất cả worker đã add vào)
+  // await scheduler.terminate();
 
-  data.data.data = newData;
+  // data.data.data = newData;
   return data;
 }
 
