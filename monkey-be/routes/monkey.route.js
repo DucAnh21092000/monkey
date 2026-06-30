@@ -60,6 +60,8 @@ router.get("/school-list", async (req, res) => {
   }
 });
 
+const { finished } = require("stream/promises");
+
 router.post("/export-videos", async (req, res) => {
   try {
     const { students = [] } = req.body;
@@ -83,50 +85,82 @@ router.post("/export-videos", async (req, res) => {
     const archive = archiver("zip", {
       forceZip64: true,
       zlib: {
-        level: 0,
+        level: 0, // video không cần nén
       },
     });
 
     archive.pipe(res);
 
-    for (let i = 0; i < students.length; i++) {
-      const student = students[i];
+    archive.on("warning", console.warn);
 
-      try {
-        if (!student?.video) continue;
+    archive.on("error", (err) => {
+      console.error("Archive error:", err);
+      res.destroy(err);
+    });
 
-        const response = await axios.get(student.video, {
-          responseType: "arraybuffer",
-          timeout: 0,
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-        });
+    archive.on("progress", (progress) => {
+      console.log(progress);
+    });
 
-        const safeName = (student.student_name || "unknown")
-          .replace(/[<>:"/\\|?*]/g, "_")
-          .trim();
+    archive.on("finish", () => {
+      console.log("ARCHIVE FINISH");
+    });
 
-        archive.append(Buffer.from(response.data), {
-          name: `${i + 1}-${safeName}.mp4`,
-        });
+    archive.on("close", () => {
+      console.log("ARCHIVE CLOSE");
+    });
 
-      } catch (err) {
-        console.error(
-          `Cannot download video of ${student.student_name}:`,
-          err.message
-        );
-      }
-    }
+    res.on("finish", () => {
+      console.log("RESPONSE FINISH");
+    });
+
+    const limit = pLimit(2);
+
+    await Promise.all(
+      students.map((student, index) =>
+        limit(async () => {
+          if (!student.video) return;
+
+          const safeName = (student.student_name || "unknown")
+            .replace(/[<>:"/\\|?*]/g, "_")
+            .trim();
+
+          try {
+            const response = await axios({
+              url: student.video,
+              method: "GET",
+              responseType: "stream",
+              timeout: 0,
+              maxRedirects: 5,
+            });
+
+            archive.append(response.data, {
+              name: `${index + 1}-${safeName}.mp4`,
+            });
+
+            // đợi stream HTTP tải xong
+            await finished(response.data);
+
+            console.log(`✔ Finished ${safeName}`);
+          } catch (err) {
+            console.error(`${safeName}:`, err.message);
+          }
+        })
+      )
+    );
+
+    console.log("All streams finished");
 
     await archive.finalize();
 
-  } catch (error) {
-    console.error("Export videos error:", error);
+    console.log("ZIP finalized");
+  } catch (err) {
+    console.error(err);
 
     if (!res.headersSent) {
       res.status(500).json({
         success: false,
-        message: error.message,
+        message: err.message,
       });
     }
   }
