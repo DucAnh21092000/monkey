@@ -67,7 +67,7 @@ router.post("/export-videos", async (req, res) => {
     if (!students.length) {
       return res.status(400).json({
         success: false,
-        message: "Không có học sinh nào được chọn",
+        message: "Không có học sinh",
       });
     }
 
@@ -82,51 +82,64 @@ router.post("/export-videos", async (req, res) => {
 
     const archive = archiver("zip", {
       forceZip64: true,
-      zlib: {
-        level: 0,
-      },
+      zlib: { level: 0 },
     });
 
     archive.pipe(res);
 
-    for (let i = 0; i < students.length; i++) {
-      const student = students[i];
+    archive.on("error", (err) => {
+      console.error(err);
+      res.destroy(err);
+    });
 
-      try {
-        if (!student?.video) continue;
+    // Chỉ 2 stream cùng lúc
+    const limit = pLimit(2);
 
-       const response = await axios.get(student.video, {
-  responseType: "stream",
-  timeout: 0,
-  maxContentLength: Infinity,
-  maxBodyLength: Infinity,
-});
+    const tasks = students.map((student, i) =>
+      limit(async () => {
+        if (!student.video) return;
 
-response.data.on("error", (err) => {
-  console.error("Stream error:", err);
-});
+        try {
+          const response = await axios({
+            method: "GET",
+            url: student.video,
+            responseType: "stream",
+            timeout: 0,
+            decompress: false,
+            maxRedirects: 5,
+            httpAgent: new (require("http").Agent)({
+              keepAlive: true,
+            }),
+            httpsAgent: new (require("https").Agent)({
+              keepAlive: true,
+            }),
+          });
 
-archive.append(response.data, {
-  name: `${i + 1}-${student.student_name}.mp4`,
-});
+          const safeName = (student.student_name || "unknown")
+            .replace(/[<>:"/\\|?*]/g, "_")
+            .trim();
 
-      } catch (err) {
-        console.error(
-          `Cannot download video of ${student.student_name}:`,
-          err.message
-        );
-      }
-    }
+          archive.append(response.data, {
+            name: `${i + 1}-${safeName}.mp4`,
+          });
+
+          console.log(`Added ${safeName}`);
+        } catch (err) {
+          console.log(`${student.student_name}: ${err.message}`);
+        }
+      })
+    );
+
+    await Promise.all(tasks);
 
     await archive.finalize();
-
-  } catch (error) {
-    console.error("Export videos error:", error);
+  } catch (err) {
+    console.error(err);
 
     if (!res.headersSent) {
       res.status(500).json({
         success: false,
-        message: error.message,
+        message: err.message,
       });
     }
   }
