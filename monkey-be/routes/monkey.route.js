@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pLimit = require("p-limit");
 const axios = require("axios");
-const fs = require("fs")
+const fs = require("fs");
 const archiver = require("archiver");
 const EXPORT_DIR = "/tmp/exports";
 const exportJobs = {};
@@ -12,17 +12,17 @@ if (!fs.existsSync(EXPORT_DIR)) {
 }
 const { randomUUID } = require("crypto");
 
+router.get("/test", (req, res) => {
+  console.log("object");
+  res.json("OK");
+});
 // create a file to stream archive data to.
 const output = fs.createWriteStream(__dirname + "/example.zip");
 const archive = archiver("zip", {
   zlib: { level: 0 }, // Sets the compression level.
 });
 const limit = pLimit(5);
-const {
-  getStatusList,
-  getFilters,
-  getSchools,
-} = require("../services/monkey.service");
+const { getStatusList, getFilters, getSchools } = require("../services/monkey.service");
 
 router.get("/status-list", async (req, res) => {
   const { school_id, page, pageSize } = req.query;
@@ -35,6 +35,12 @@ router.get("/status-list", async (req, res) => {
       error: err.message,
     });
   }
+});
+
+router.get("/download-file/:id", (req, res) => {
+  const filePath = path.join(__dirname, "../temp", `${req.params.id}.mp4`);
+
+  res.download(filePath);
 });
 
 router.get("/download/:file", (req, res) => {
@@ -53,7 +59,7 @@ router.get("/download/:file", (req, res) => {
       return;
     }
 
-    fs.unlink(filePath, () => { });
+    fs.unlink(filePath, () => {});
   });
 });
 
@@ -88,8 +94,6 @@ router.get("/school-list", async (req, res) => {
 });
 
 const { finished } = require("stream/promises");
-
-
 
 router.post("/export-videos", async (req, res) => {
   const jobId = randomUUID();
@@ -137,9 +141,7 @@ async function exportZip(jobId, body) {
 
     if (!student.video) continue;
 
-    const safeName = (student.student_name || "unknown")
-      .replace(/[<>:"/\\|?*]/g, "_")
-      .trim();
+    const safeName = (student.student_name || "unknown").replace(/[<>:"/\\|?*]/g, "_").trim();
 
     try {
       const response = await axios({
@@ -161,15 +163,10 @@ async function exportZip(jobId, body) {
       exportJobs[jobId].current++;
 
       exportJobs[jobId].percent = Math.round(
-        (exportJobs[jobId].current /
-          exportJobs[jobId].total) *
-        100
+        (exportJobs[jobId].current / exportJobs[jobId].total) * 100,
       );
 
-      console.log(
-        `${exportJobs[jobId].current}/${exportJobs[jobId].total}`
-      );
-
+      console.log(`${exportJobs[jobId].current}/${exportJobs[jobId].total}`);
     } catch (err) {
       console.log(err.message);
     }

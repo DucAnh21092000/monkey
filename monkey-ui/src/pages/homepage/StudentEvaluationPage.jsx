@@ -1,139 +1,45 @@
-import {
-  BankOutlined,
-  FilterOutlined,
-  TeamOutlined,
-  TrophyOutlined,
-} from "@ant-design/icons";
+import { BankOutlined, FilterOutlined, TeamOutlined, TrophyOutlined } from "@ant-design/icons";
 import {
   Avatar,
   Button,
   Card,
   Col,
-  Drawer,
-  Form,
   Image,
   Input,
+  message,
   Row,
   Select,
-  Space,
   Statistic,
   Table,
   Tag,
 } from "antd";
 import axios from "axios";
 import {
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import {
-  Chart as ChartJS,
   ArcElement,
   BarElement,
   CategoryScale,
+  Chart as ChartJS,
   Legend,
   LinearScale,
   Tooltip,
 } from "chart.js";
-import { Bar, Doughnut } from "react-chartjs-2";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import ByReportChart from "./components/charts/ByReportChart";
+import LiveChart from "./components/charts/LiveChart";
+import RepeatedNameChart from "./components/charts/RepeatedNameChart";
+import WithReportChart from "./components/charts/WithReportChart";
+import FilterDraw from "./components/filter/FilterDraw";
+import { baseUrl, resultMap, verdictColors } from "./const";
+import {
+  getCachedSchools,
+  getRecentSchoolIds,
+  setCachedSchools,
+  setRecentSchoolIds,
+  sortSchoolsByRecent,
+} from "./utils";
 
-ChartJS.register(
-  ArcElement,
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  Tooltip,
-  Legend,
-);
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 const { Search } = Input;
-import { message } from "antd";
-
-const SCHOOL_CACHE_KEY = "monkey-school-list-cache";
-const SCHOOL_RECENT_KEY = "monkey-school-recent-cache";
-const SCHOOL_CACHE_TTL = 1000 * 60 * 60 * 24 * 7;
-
-function getCachedSchools() {
-  try {
-    const cached = localStorage.getItem(SCHOOL_CACHE_KEY);
-    if (!cached) return null;
-
-    const parsed = JSON.parse(cached);
-    if (!parsed?.data || Date.now() - parsed.timestamp > SCHOOL_CACHE_TTL) {
-      localStorage.removeItem(SCHOOL_CACHE_KEY);
-      return null;
-    }
-
-    return parsed.data;
-  } catch {
-    return null;
-  }
-}
-
-const resultMap = {
-  1: {
-    label: "Cần cải thiện - Need Improvement",
-    color: "error",
-  },
-  2: {
-    label: "Đạt - Good",
-    color: "processing",
-  },
-  3: {
-    label: "Rất tốt - Very Good",
-    color: "success",
-  },
-  4: {
-    label: "Vượt trội - Excellent",
-    color: "gold",
-  },
-};
-
-function setCachedSchools(data) {
-  try {
-    localStorage.setItem(
-      SCHOOL_CACHE_KEY,
-      JSON.stringify({
-        data,
-        timestamp: Date.now(),
-      }),
-    );
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function getRecentSchoolIds() {
-  try {
-    const cached = localStorage.getItem(SCHOOL_RECENT_KEY);
-    if (!cached) return [];
-    const parsed = JSON.parse(cached);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function setRecentSchoolIds(ids) {
-  try {
-    localStorage.setItem(SCHOOL_RECENT_KEY, JSON.stringify(ids));
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function sortSchoolsByRecent(schools, recentIds = []) {
-  const recentSet = new Set(recentIds);
-
-  return [...schools].sort((a, b) => {
-    const aRecent = recentSet.has(a.value) ? 1 : 0;
-    const bRecent = recentSet.has(b.value) ? 1 : 0;
-
-    if (aRecent !== bRecent) return bRecent - aRecent;
-    return (a.label || "").localeCompare(b.label || "");
-  });
-}
 
 export default function StudentReportPage() {
   const [selectedSchool, setSelectedSchool] = useState();
@@ -148,9 +54,7 @@ export default function StudentReportPage() {
     total: 0,
   });
   const [openFilter, setOpenFilter] = useState(false);
-  const [recentSchoolIds, setRecentSchoolIdsState] = useState(() =>
-    getRecentSchoolIds(),
-  );
+  const [recentSchoolIds, setRecentSchoolIdsState] = useState(() => getRecentSchoolIds());
   const [pendingRecentSchool, setPendingRecentSchool] = useState();
 
   const defaultFilters = {
@@ -166,66 +70,52 @@ export default function StudentReportPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [exporting, setExporting] = useState(false);
-
   const [loading, setLoading] = useState(false);
-  const fetchStudents = useCallback(
-    async (schoolId, page = 1, pageSize = 10) => {
-      try {
-        setLoading(true);
 
-        const response = await axios.get(
-          "https://monkey-1gz4.onrender.com/api/status-list",
-          {
-            params: {
-              school_id: schoolId,
-              page,
-              pageSize,
-            },
-          },
-        );
-        setListStudent(response.data?.data?.data ?? []);
+  const fetchStudents = useCallback(async (schoolId, page = 1, pageSize = 10) => {
+    try {
+      setLoading(true);
 
-        setPagination({
-          current: page,
+      const response = await axios.get(`${baseUrl}/api/status-list`, {
+        params: {
+          school_id: schoolId,
+          page,
           pageSize,
-          total: response.data?.data?.total ?? 0,
-        });
-      } catch (error) {
-        console.error("Error fetching students:", error);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
+        },
+      });
+      setListStudent(response.data?.data?.data ?? []);
+
+      setPagination({
+        current: page,
+        pageSize,
+        total: response.data?.data?.total ?? 0,
+      });
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const filteredStudentsMulti = useMemo(() => {
     return listStudent.filter((student) => {
       const matchKeyword =
         !deferredKeyword ||
-        student.student_name
-          ?.toLowerCase()
-          .includes(deferredKeyword.toLowerCase());
+        student.student_name?.toLowerCase().includes(deferredKeyword.toLowerCase());
 
-      const matchSchool =
-        !filters.school || student.school_id === filters.school;
+      const matchSchool = !filters.school || student.school_id === filters.school;
 
-      const matchClass =
-        filters.class.length === 0 || filters.class.includes(student.class_id);
+      const matchClass = filters.class.length === 0 || filters.class.includes(student.class_id);
 
       const matchReport =
-        filters.report.length === 0 ||
-        filters.report.includes(student.report_name);
+        filters.report.length === 0 || filters.report.includes(student.report_name);
 
       const matchTestResult =
-        filters.testResult.length === 0 ||
-        filters.testResult.includes(student.verdict);
+        filters.testResult.length === 0 || filters.testResult.includes(student.verdict);
 
       const matchStudentName =
         !filters.studentName ||
-        student.student_name
-          ?.toLowerCase()
-          .includes(filters.studentName.toLowerCase());
+        student.student_name?.toLowerCase().includes(filters.studentName.toLowerCase());
 
       return (
         matchKeyword &&
@@ -263,7 +153,7 @@ export default function StudentReportPage() {
       });
 
       const { data } = await axios.post(
-        "https://monkey-1gz4.onrender.com/api/export-videos",
+        `${baseUrl}/api/export-videos`,
         {
           students: selectedRows.map((item) => ({
             student_name: item.student_name,
@@ -273,7 +163,7 @@ export default function StudentReportPage() {
         },
         {
           timeout: 0,
-        }
+        },
       );
 
       if (!data.success) {
@@ -285,9 +175,7 @@ export default function StudentReportPage() {
       // Theo dõi tiến độ
       const timer = setInterval(async () => {
         try {
-          const { data: progress } = await axios.get(
-            `https://monkey-1gz4.onrender.com/api/export-progress/${jobId}`
-          );
+          const { data: progress } = await axios.get(`${baseUrl}/api/export-progress/${jobId}`);
 
           message.loading({
             key: "export",
@@ -305,10 +193,7 @@ export default function StudentReportPage() {
             });
 
             // tải file
-            window.open(
-              `https://monkey-1gz4.onrender.com/api${progress.url}`,
-              "_blank"
-            );
+            window.open(`${baseUrl}${progress.url}`, "_blank");
 
             setSelectedRowKeys([]);
             setSelectedRows([]);
@@ -331,7 +216,7 @@ export default function StudentReportPage() {
 
             setExporting(false);
           }
-        } catch (err) {
+        } catch (_) {
           clearInterval(timer);
 
           message.error({
@@ -344,23 +229,13 @@ export default function StudentReportPage() {
       }, 1000);
     } catch (error) {
       message.error({
-        content:
-          error?.response?.data?.message ||
-          error.message ||
-          "Xuất video thất bại",
+        content: error?.response?.data?.message || error.message || "Xuất video thất bại",
         key: "export",
         duration: 3,
       });
 
       setExporting(false);
     }
-  };
-
-  const verdictColors = {
-    1: "#CBD5E1", // Need Improvement
-    2: "#FCD34D", // Good
-    3: "#4ADE80", // Very Good
-    4: "#16A34A", // Excellent
   };
 
   const chartData = useMemo(() => {
@@ -385,9 +260,7 @@ export default function StudentReportPage() {
       datasets: [
         {
           data: Object.values(summary),
-          backgroundColor: keys.map(
-            (key) => verdictColors[key] || "#d9d9d9"
-          ),
+          backgroundColor: keys.map((key) => verdictColors[key] || "#d9d9d9"),
         },
       ],
     };
@@ -401,14 +274,10 @@ export default function StudentReportPage() {
       summary[key] = (summary[key] || 0) + 1;
     });
 
-    const totalReports = Object.values(summary).reduce(
-      (acc, value) => acc + value,
-      0,
-    );
+    const totalReports = Object.values(summary).reduce((acc, value) => acc + value, 0);
     const labels = Object.keys(summary).map((key) => {
       const count = summary[key];
-      const percent =
-        totalReports > 0 ? ((count / totalReports) * 100).toFixed(2) : "0.00";
+      const percent = totalReports > 0 ? ((count / totalReports) * 100).toFixed(2) : "0.00";
       return `${key} (${count}) - ${percent}%`;
     });
 
@@ -418,14 +287,7 @@ export default function StudentReportPage() {
         {
           label: "Students",
           data: Object.values(summary),
-          backgroundColor: [
-            "#6366f1",
-            "#0ea5e9",
-            "#14b8a6",
-            "#f59e0b",
-            "#ef4444",
-            "#8b5cf6",
-          ],
+          backgroundColor: ["#6366f1", "#0ea5e9", "#14b8a6", "#f59e0b", "#ef4444", "#8b5cf6"],
           borderRadius: 10,
           maxBarThickness: 42,
         },
@@ -445,22 +307,15 @@ export default function StudentReportPage() {
       .filter(([, count]) => count > 1)
       .sort((a, b) => b[1] - a[1]);
 
-    const totalDuplicates = duplicates.reduce(
-      (acc, [, count]) => acc + count,
-      0,
-    );
+    const totalDuplicates = duplicates.reduce((acc, [, count]) => acc + count, 0);
     const labels = duplicates.length
       ? duplicates.map(([name, count]) => {
-        const percent =
-          totalDuplicates > 0
-            ? ((count / totalDuplicates) * 100).toFixed(2)
-            : "0.00";
-        return `${name} (${count}) - ${percent}%`;
-      })
+          const percent =
+            totalDuplicates > 0 ? ((count / totalDuplicates) * 100).toFixed(2) : "0.00";
+          return `${name} (${count}) - ${percent}%`;
+        })
       : ["No duplicates"];
-    const values = duplicates.length
-      ? duplicates.map(([, count]) => count)
-      : [0];
+    const values = duplicates.length ? duplicates.map(([, count]) => count) : [0];
 
     return {
       labels,
@@ -477,9 +332,7 @@ export default function StudentReportPage() {
   }, [filteredStudentsMulti]);
 
   const reportAvailabilityChartData = useMemo(() => {
-    const withReport = filteredStudentsMulti.filter(
-      (student) => student.verdict,
-    ).length;
+    const withReport = filteredStudentsMulti.filter((student) => student.verdict).length;
     const withoutReport = filteredStudentsMulti.length - withReport;
     const total = filteredStudentsMulti.length || 1;
 
@@ -516,7 +369,7 @@ export default function StudentReportPage() {
     }
 
     axios
-      .get("https://monkey-1gz4.onrender.com/api/school-list")
+      .get(`${baseUrl}/api/school-list`)
       .then((schoolResponse) => {
         if (cancelled) return;
 
@@ -527,10 +380,7 @@ export default function StudentReportPage() {
             value: item.school_id,
           })) ?? [];
 
-        const sortedSchools = sortSchoolsByRecent(
-          newListSchool,
-          recentSchoolIds,
-        );
+        const sortedSchools = sortSchoolsByRecent(newListSchool, recentSchoolIds);
         setListSchool(sortedSchools);
         setCachedSchools(sortedSchools);
       })
@@ -592,8 +442,7 @@ export default function StudentReportPage() {
                 backgroundColor: "#ffe58f",
                 padding: "0 2px",
                 borderRadius: 2,
-              }}
-            >
+              }}>
               {part}
             </span>
           ) : (
@@ -606,9 +455,7 @@ export default function StudentReportPage() {
 
   const reportOptions = useMemo(
     () =>
-      [
-        ...new Set(listStudent.map((item) => item.report_name).filter(Boolean)),
-      ].map((value) => ({
+      [...new Set(listStudent.map((item) => item.report_name).filter(Boolean))].map((value) => ({
         label: value,
         value,
       })),
@@ -617,9 +464,7 @@ export default function StudentReportPage() {
 
   const reportFilters = useMemo(
     () =>
-      [
-        ...new Set(listStudent.map((item) => item.report_name).filter(Boolean)),
-      ].map((value) => ({
+      [...new Set(listStudent.map((item) => item.report_name).filter(Boolean))].map((value) => ({
         text: value,
         value,
       })),
@@ -644,9 +489,7 @@ export default function StudentReportPage() {
 
   const schoolFilters = useMemo(
     () =>
-      [
-        ...new Set(listStudent.map((item) => item.school_name).filter(Boolean)),
-      ].map((value) => ({
+      [...new Set(listStudent.map((item) => item.school_name).filter(Boolean))].map((value) => ({
         text: value,
         value,
       })),
@@ -655,13 +498,11 @@ export default function StudentReportPage() {
 
   const testResultFilters = useMemo(
     () =>
-      [...new Set(listStudent.map((item) => item.verdict).filter(Boolean))].map(
-        (value) => ({
-          text: resultMap[value]?.label || value,
-          value,
-          label: resultMap[value]?.label || value,
-        }),
-      ),
+      [...new Set(listStudent.map((item) => item.verdict).filter(Boolean))].map((value) => ({
+        text: resultMap[value]?.label || value,
+        value,
+        label: resultMap[value]?.label || value,
+      })),
     [listStudent],
   );
 
@@ -671,9 +512,7 @@ export default function StudentReportPage() {
       dataIndex: "stt",
       width: 50,
       fixed: "left",
-      render: (value, record, index) => (
-        <span style={{ fontWeight: 600 }}>{index + 1}</span>
-      ),
+      render: (value, record, index) => <span style={{ fontWeight: 600 }}>{index + 1}</span>,
     },
     {
       title: "",
@@ -685,8 +524,7 @@ export default function StudentReportPage() {
           style={{
             backgroundColor: "#1677ff",
             fontWeight: 600,
-          }}
-        >
+          }}>
           {record.student_name?.charAt(0)}
         </Avatar>
       ),
@@ -790,14 +628,12 @@ export default function StudentReportPage() {
     [recentSchoolIds],
   );
 
-
-
   const visibleCount = filteredStudentsMulti.length;
   const strongResultCount = filteredStudentsMulti.filter((student) =>
     [2, 3, 4].includes(student.verdict),
   ).length;
-  const schoolOptions = useMemo(() => {
 
+  const schoolOptions = useMemo(() => {
     const recentSchools = listSchool
       .filter((school) => recentSchoolIds.includes(school.value))
       .map((school) => ({
@@ -810,8 +646,7 @@ export default function StudentReportPage() {
               justifyContent: "space-between",
               gap: 8,
               width: "100%",
-            }}
-          >
+            }}>
             <span>{school.label}</span>
             <button
               type="button"
@@ -835,8 +670,7 @@ export default function StudentReportPage() {
                 borderRadius: 999,
                 fontWeight: 600,
               }}
-              aria-label={`Remove ${school.label} from recent schools`}
-            >
+              aria-label={`Remove ${school.label} from recent schools`}>
               ✕
             </button>
           </div>
@@ -861,23 +695,14 @@ export default function StudentReportPage() {
 
     return [
       ...(recentSchools.length > 0
-        ? [
-          { label: "Recently used", title: true, disabled: true },
-          ...recentSchools,
-        ]
+        ? [{ label: "Recently used", title: true, disabled: true }, ...recentSchools]
         : []),
       ...(otherSchools.length > 0
-        ? [
-          { label: "All schools", title: true, disabled: true },
-          ...otherSchools,
-        ]
+        ? [{ label: "All schools", title: true, disabled: true }, ...otherSchools]
         : []),
     ];
-  }, [
-    handleRemoveRecentSchool,
-    listSchool,
-    recentSchoolIds,
-  ]);
+  }, [handleRemoveRecentSchool, listSchool, recentSchoolIds]);
+
   const activeFilterCount = [
     Boolean(keyword?.trim()),
     filters.school !== undefined,
@@ -893,17 +718,14 @@ export default function StudentReportPage() {
         <div>
           <p className="hero-eyebrow">🌸 Student evaluation dashboard</p>
           <p className="hero-copyright">
-            Copyright © <span style={{ color: "#f8a5c2" }}>Diggory Dinh</span>{" "}
-            with love
+            Copyright © <span style={{ color: "#f8a5c2" }}>Diggory Dinh</span> with love
           </p>
           <h1>Follow every student’s progress with a calm, clear view.</h1>
         </div>
         <div className="hero-badge">
           <span>✨ {visibleCount} visible</span>
           <span>✅ {strongResultCount} good results</span>
-          <span>
-            🏫 {new Set(listStudent.map((x) => x.school_id)).size} schools
-          </span>
+          <span>🏫 {new Set(listStudent.map((x) => x.school_id)).size} schools</span>
         </div>
       </div>
 
@@ -914,9 +736,7 @@ export default function StudentReportPage() {
               <TeamOutlined />
             </div>
             <Statistic title="Total Students" value={pagination.total} />
-            <p className="stat-card__text">
-              Students currently visible in the report
-            </p>
+            <p className="stat-card__text">Students currently visible in the report</p>
           </Card>
         </Col>
 
@@ -927,13 +747,9 @@ export default function StudentReportPage() {
             </div>
             <Statistic
               title="Schools"
-              value={
-                new Set(filteredStudentsMulti.map((x) => x.school_id)).size
-              }
+              value={new Set(filteredStudentsMulti.map((x) => x.school_id)).size}
             />
-            <p className="stat-card__text">
-              Different schools included in the dataset
-            </p>
+            <p className="stat-card__text">Different schools included in the dataset</p>
           </Card>
         </Col>
 
@@ -943,9 +759,7 @@ export default function StudentReportPage() {
               <TrophyOutlined />
             </div>
             <Statistic title="Reports" value={filteredStudentsMulti.length} />
-            <p className="stat-card__text">
-              Performance summaries ready to review
-            </p>
+            <p className="stat-card__text">Performance summaries ready to review</p>
           </Card>
         </Col>
       </Row>
@@ -964,8 +778,7 @@ export default function StudentReportPage() {
                   ghost
                   loading={exporting}
                   disabled={!selectedRows.length}
-                  onClick={handleExportVideos}
-                >
+                  onClick={handleExportVideos}>
                   Export Videos ({selectedRows.length})
                 </Button>
                 <div className="toolbar-btn-wrapper">
@@ -976,8 +789,7 @@ export default function StudentReportPage() {
                       setDraftFilters(filters);
                       setOpenFilter(true);
                     }}
-                    className="toolbar-btn toolbar-btn-primary"
-                  >
+                    className="toolbar-btn toolbar-btn-primary">
                     Filter
                   </Button>
                   {activeFilterCount > 0 && (
@@ -1006,9 +818,7 @@ export default function StudentReportPage() {
                   filterOption={(input, option) => {
                     const searchText = option?.data?.searchText ?? "";
 
-                    return searchText
-                      .toLowerCase()
-                      .includes(input.toLowerCase());
+                    return searchText.toLowerCase().includes(input.toLowerCase());
                   }}
                 />
               </Col>
@@ -1028,9 +838,7 @@ export default function StudentReportPage() {
             <Table
               rowSelection={rowSelection}
               loading={loading}
-              rowKey={(record) =>
-                `${record.student_id}-${record.game_lesson_id}`
-              }
+              rowKey={(record) => `${record.student_id}-${record.game_lesson_id}`}
               columns={columns}
               dataSource={filteredStudentsMulti}
               scroll={{ x: 1400 }}
@@ -1050,252 +858,37 @@ export default function StudentReportPage() {
         <>
           <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
             <Col xs={24} lg={12}>
-              <Card
-                className="chart-card"
-                title="Result overview"
-                extra={<span className="card-pill">Live chart</span>}
-              >
-                <div className="chart-wrapper">
-                  <Doughnut
-                    data={chartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      cutout: "70%",
-                      plugins: {
-                        legend: {
-                          position: "bottom",
-                        },
-                        tooltip: {
-                          callbacks: {
-                            label: (context) => {
-                              const value = context.raw;
-                              const total = context.dataset.data.reduce(
-                                (acc, item) => acc + item,
-                                0,
-                              );
-                              const percent =
-                                total > 0
-                                  ? ((value / total) * 100).toFixed(2)
-                                  : "0.00";
-                              return `${context.label}: ${value} (${percent}%)`;
-                            },
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </div>
-              </Card>
+              <LiveChart chartData={chartData} />
             </Col>
 
             <Col xs={24} lg={12}>
-              <Card
-                className="chart-card"
-                title="Duplicate students"
-                extra={<span className="card-pill">Repeated names</span>}
-              >
-                <div className="chart-wrapper chart-wrapper-large">
-                  <Bar
-                    data={duplicateStudentChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          display: false,
-                        },
-                      },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          ticks: {
-                            stepSize: 1,
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </div>
-              </Card>
+              <RepeatedNameChart duplicateStudentChartData={duplicateStudentChartData} />
             </Col>
           </Row>
 
           <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
             <Col xs={24} lg={12}>
-              <Card
-                bordered={false}
-                className="chart-card"
-                title="Report count"
-                extra={<span className="card-pill">By report</span>}
-              >
-                <div className="chart-wrapper chart-wrapper-large">
-                  <Bar
-                    data={reportChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          display: false,
-                        },
-                        tooltip: {
-                          callbacks: {
-                            label: (context) => {
-                              const value = context.raw;
-                              const total = context.dataset.data.reduce(
-                                (acc, item) => acc + item,
-                                0,
-                              );
-                              const percent =
-                                total > 0
-                                  ? ((value / total) * 100).toFixed(2)
-                                  : "0.00";
-                              return `${context.label}: ${value} (${percent}%)`;
-                            },
-                          },
-                        },
-                      },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          ticks: {
-                            stepSize: 1,
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </div>
-              </Card>
+              <ByReportChart reportChartData={reportChartData} />
             </Col>
 
             <Col xs={24} lg={12}>
-              <Card
-                bordered={false}
-                className="chart-card"
-                title="Report availability"
-                extra={<span className="card-pill">With / without report</span>}
-              >
-                <div className="chart-wrapper">
-                  <Doughnut
-                    data={reportAvailabilityChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      cutout: "70%",
-                      plugins: {
-                        legend: {
-                          position: "bottom",
-                        },
-                        tooltip: {
-                          callbacks: {
-                            label: (context) => {
-                              const value = context.raw;
-                              const total = context.dataset.data.reduce(
-                                (acc, item) => acc + item,
-                                0,
-                              );
-                              const percent =
-                                total > 0
-                                  ? ((value / total) * 100).toFixed(2)
-                                  : "0.00";
-                              return `${context.label}: ${value} (${percent}%)`;
-                            },
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </div>
-              </Card>
+              <WithReportChart reportAvailabilityChartData={reportAvailabilityChartData} />
             </Col>
           </Row>
         </>
       ) : null}
 
-      <Drawer
-        title="Filter Students"
-        width={400}
-        open={openFilter}
-        onClose={() => setOpenFilter(false)}
-        footer={
-          <Space>
-            <Button
-              type="primary"
-              onClick={() => {
-                setFilters(draftFilters);
-                setOpenFilter(false);
-              }}
-            >
-              Apply
-            </Button>
-
-            <Button
-              onClick={() => {
-                setDraftFilters(defaultFilters);
-              }}
-            >
-              Clear
-            </Button>
-
-            <Button onClick={() => setOpenFilter(false)}>Close</Button>
-          </Space>
-        }
-      >
-        <Form layout="vertical">
-          <Form.Item label="Class">
-            <Select
-              mode="multiple"
-              maxTagCount="responsive"
-              allowClear
-              placeholder="Chọn lớp"
-              options={classFilters}
-              value={draftFilters.class}
-              onChange={(value) =>
-                setDraftFilters((prev) => ({
-                  ...prev,
-                  class: value,
-                }))
-              }
-            />
-          </Form.Item>
-
-          <Form.Item label="Report">
-            <Select
-              mode="multiple"
-              maxTagCount="responsive"
-              allowClear
-              placeholder="Chọn report"
-              options={reportOptions}
-              value={draftFilters.report}
-              onChange={(value) =>
-                setDraftFilters((prev) => ({
-                  ...prev,
-                  report: value,
-                }))
-              }
-            />
-          </Form.Item>
-
-          <Form.Item label="Test Result">
-            <Select
-              mode="multiple"
-              maxTagCount="responsive"
-              allowClear
-              placeholder="Chọn kết quả"
-              options={testResultFilters}
-              value={draftFilters.testResult}
-              onChange={(value) =>
-                setDraftFilters((prev) => ({
-                  ...prev,
-                  testResult: value,
-                }))
-              }
-            />
-          </Form.Item>
-        </Form>
-      </Drawer>
+      <FilterDraw
+        openFilter={openFilter}
+        setOpenFilter={setOpenFilter}
+        draftFilters={draftFilters}
+        setDraftFilters={setDraftFilters}
+        defaultFilters={defaultFilters}
+        setFilters={setFilters}
+        classFilters={classFilters}
+        reportOptions={reportOptions}
+        testResultFilters={testResultFilters}
+      />
     </div>
   );
 }
