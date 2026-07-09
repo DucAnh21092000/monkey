@@ -1,7 +1,7 @@
 // deploy in render
-//export const baseUrl = "https://monkey-1gz4.onrender.com";
+export const baseUrl = "https://monkey-1gz4.onrender.com";
 // deploy in local
-export const baseUrl = "http://localhost:3000";
+//export const baseUrl = "http://localhost:3000";
 
 export const SCHOOL_CACHE_KEY = "monkey-school-list-cache";
 export const SCHOOL_RECENT_KEY = "monkey-school-recent-cache";
