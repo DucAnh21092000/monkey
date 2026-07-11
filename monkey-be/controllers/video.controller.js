@@ -2,11 +2,9 @@ const progress = require("../services/progress.service");
 const downloadService = require("../services/download.service");
 const crypto = require("crypto");
 const path = require("path");
-
 const { spawn } = require("child_process");
 const fs = require("fs");
 const { randomUUID } = require("crypto");
-const path = require("path");
 
 const ytDlpPath = path.join(process.cwd(), "bin", "yt-dlp");
 
