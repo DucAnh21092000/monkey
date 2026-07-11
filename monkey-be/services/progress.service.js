@@ -1,31 +1,24 @@
 const jobs = new Map();
 
-exports.create = (id) => {
-  jobs.set(id, {
-    progress: 0,
-    status: "waiting",
-  });
-};
+module.exports = {
+  set(id, data) {
+    jobs.set(id, data);
+  },
 
-exports.update = (id, value) => {
-  if (!jobs.has(id)) return;
+  get(id) {
+    return jobs.get(id);
+  },
 
-  jobs.get(id).progress = value;
-};
+  update(id, data) {
+    const old = jobs.get(id) || {};
 
-exports.finish = (id) => {
-  if (!jobs.has(id)) return;
+    jobs.set(id, {
+      ...old,
+      ...data,
+    });
+  },
 
-  jobs.get(id).progress = 100;
-  jobs.get(id).status = "done";
-};
-
-exports.fail = (id) => {
-  if (!jobs.has(id)) return;
-
-  jobs.get(id).status = "error";
-};
-
-exports.get = (id) => {
-  return jobs.get(id) || null;
+  delete(id) {
+    jobs.delete(id);
+  },
 };

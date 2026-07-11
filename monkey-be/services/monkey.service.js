@@ -2,20 +2,19 @@ const axios = require("axios");
 const sharp = require("sharp");
 const Tesseract = require("tesseract.js");
 const pLimit = require("p-limit");
-const { createWorker, createScheduler } = require('tesseract.js');
+const { createWorker, createScheduler } = require("tesseract.js");
 const limit = pLimit(3);
+const token =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NDY2Nzg3LCJuYW1lIjoidmFuaGFuaCBraW5keSIsImF2YXRhciI6IiIsImVtYWlsIjoidmFuaGFuaC5raW5keUBtb25rZXkuZWR1LnZuIiwicGhvbmUiOiIiLCJyb2xlcyI6WyJBZG1pbl9DbGFzcyJdLCJyb2xlX25hbWUiOnsiQWRtaW5fQ2xhc3MiOiJBZG1pbl9DbGFzcyJ9LCJyb2xlX3ByaW9yaXR5IjoiQWRtaW5fQ2xhc3MiLCJpc3MiOiJta19jbGFzc19nbyIsInN1YiI6IjQ2Njc4NyIsImF1ZCI6WyJtay1jbGFzcy1nby1jbGllbnQiXSwiZXhwIjoxNzg2MTg0MDQwLCJuYmYiOjE3ODM1OTIwNDAsImlhdCI6MTc4MzU5MjA0MCwianRpIjoiMzM3MTA5Mzg1ODc5NTUyMSJ9.aEcMIs1G0YF5lcDY0Dv9px6TOaIkF50Ykeik4YMMqtE";
 
 const api = axios.create({
   baseURL: "https://web.monkeyenglish.net/classroom_go/api/v1",
   headers: {
-    token:
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NDY2Nzg3LCJuYW1lIjoidmFuaGFuaCBraW5keSIsImF2YXRhciI6IiIsImVtYWlsIjoidmFuaGFuaC5raW5keUBtb25rZXkuZWR1LnZuIiwicGhvbmUiOiIiLCJyb2xlcyI6WyJBZG1pbl9DbGFzcyJdLCJyb2xlX25hbWUiOnsiQWRtaW5fQ2xhc3MiOiJBZG1pbl9DbGFzcyJ9LCJyb2xlX3ByaW9yaXR5IjoiQWRtaW5fQ2xhc3MiLCJpc3MiOiJta19jbGFzc19nbyIsInN1YiI6IjQ2Njc4NyIsImF1ZCI6WyJtay1jbGFzcy1nby1jbGllbnQiXSwiZXhwIjoxNzg2MTg0MDQwLCJuYmYiOjE3ODM1OTIwNDAsImlhdCI6MTc4MzU5MjA0MCwianRpIjoiMzM3MTA5Mzg1ODc5NTUyMSJ9.aEcMIs1G0YF5lcDY0Dv9px6TOaIkF50Ykeik4YMMqtE",
+    token: token,
     Origin: "https://class.monkey.edu.vn",
     Referer: "https://class.monkey.edu.vn/",
   },
 });
-
-
 
 const OCR_CACHE = new Map();
 const IMAGE_BUFFER_CACHE = new Map();
@@ -53,14 +52,11 @@ async function getImageBuffer(imageUrl) {
   return imageBuffer;
 }
 
-
-
-
 function checkTestResultClean(ocrText) {
   if (!ocrText) return "";
 
   // 1. Làm sạch text: chuyển chữ thường, chuẩn hóa khoảng trắng
-  const cleanText = ocrText.toLowerCase().replace(/\s+/g, ' ');
+  const cleanText = ocrText.toLowerCase().replace(/\s+/g, " ");
 
   // 2. Regex bóc tách phần kết quả đứng sau cụm "kết quả bài test / test result"
   // Chấp nhận các lỗi quét chữ l/t/1 như: test result, test resuttr, test resu1t...
@@ -87,7 +83,10 @@ function checkTestResultClean(ocrText) {
 
     // KIỂM TRA TRẠNG THÁI 4: Đạt - Good
     // Loại trừ trường hợp chứa "very good" vì "very good" cũng có chữ "good"
-    if (resultPart.includes("đạt") || (resultPart.includes("good") && !resultPart.includes("very good"))) {
+    if (
+      resultPart.includes("đạt") ||
+      (resultPart.includes("good") && !resultPart.includes("very good"))
+    ) {
       return "Đạt - Good";
     }
   }
@@ -102,7 +101,10 @@ function checkTestResultClean(ocrText) {
   if (cleanText.includes("cần cải thiện") || cleanText.includes("need improvement")) {
     return "Cần cải thiện - Need Improvement";
   }
-  if (cleanText.includes("đạt") || (cleanText.includes("good") && !cleanText.includes("very good"))) {
+  if (
+    cleanText.includes("đạt") ||
+    (cleanText.includes("good") && !cleanText.includes("very good"))
+  ) {
     return "Đạt - Good";
   }
 
@@ -120,7 +122,7 @@ async function extractTestResult(imageUrl, scheduler) {
     let result = "";
 
     // Sử dụng scheduler.add thay vì worker.recognize
-    const ret = await scheduler.addJob('recognize', imageUrl);
+    const ret = await scheduler.addJob("recognize", imageUrl);
     const text = ret.data.text;
     result = checkTestResultClean(text);
     setCacheValue(OCR_CACHE, imageUrl, result);
@@ -187,15 +189,16 @@ async function getFilters() {
 }
 
 const getSchools = async () => {
-  const { data } = await api.get("https://web.monkeyenglish.net/classroom_go/api/v2/auth/get-meta-info");
+  const { data } = await api.get(
+    "https://web.monkeyenglish.net/classroom_go/api/v2/auth/get-meta-info",
+  );
 
   // sửa lại field theo response thực tế
   return data?.data?.schools || [];
 };
 
-
 module.exports = {
   getStatusList,
   getFilters,
-  getSchools
+  getSchools,
 };

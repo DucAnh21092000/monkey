@@ -10,26 +10,41 @@ export default function EditVideo() {
 
   const handleSubmit = async () => {
     try {
-      const res = await axios.post(
-        `${baseUrl}/api/video/download`,
-        { url },
-        {
-          responseType: "blob",
-        },
-      );
+      const res = await axios.post(`${baseUrl}/api/video/download`, {
+        url,
+      });
+
+      setJobId(res.data.jobId);
+
+      const disposition = res.headers["content-disposition"];
+
+      let fileName = "video.mp4";
+
+      if (disposition) {
+        const match = disposition.match(/filename\*=UTF-8''(.+)/);
+
+        if (match) {
+          fileName = decodeURIComponent(match[1]);
+        }
+      }
 
       const blob = new Blob([res.data], {
         type: "video/mp4",
       });
 
-      const downloadUrl = window.URL.createObjectURL(blob);
+      const downloadUrl = URL.createObjectURL(blob);
 
       const a = document.createElement("a");
       a.href = downloadUrl;
-      a.download = "video.mp4";
-      a.click();
+      a.download = fileName;
 
-      window.URL.revokeObjectURL(downloadUrl);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      setTimeout(() => {
+        URL.revokeObjectURL(downloadUrl);
+      }, 5000);
     } catch (err) {
       console.error(err);
     }
@@ -40,7 +55,7 @@ export default function EditVideo() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await axios.get(`/api/video/progress/${jobId}`);
+        const res = await axios.get(`${baseUrl}/api/video/progress/${jobId}`);
 
         const data = res.data.data;
 
@@ -92,7 +107,7 @@ export default function EditVideo() {
           {status === "done" && (
             <button
               style={styles.download}
-              onClick={() => (window.location.href = `/api/video/download-file/${jobId}`)}>
+              onClick={() => (window.location.href = `${baseUrl}/api/video/download/${jobId}`)}>
               Download
             </button>
           )}
