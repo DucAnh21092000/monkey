@@ -193,7 +193,7 @@ export default function StudentReportPage() {
             });
 
             // tải file
-            window.open(`${baseUrl}${progress.url}`, "_blank");
+            window.open(`${baseUrl}/api/${progress.url}`, "_blank");
 
             setSelectedRowKeys([]);
             setSelectedRows([]);
