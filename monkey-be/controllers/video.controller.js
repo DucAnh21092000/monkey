@@ -1,4 +1,4 @@
-const progress = require("../services/progress.service");
+const progressService = require("../services/progress.service");
 const downloadService = require("../services/download.service");
 const crypto = require("crypto");
 const path = require("path");
@@ -246,8 +246,6 @@ const rotate = async (req, res) => {
     }
   })();
 };
-
-const progressService = require("../services/progress.service");
 
 const progressFun = (req, res) => {
   const job = progressService.get(req.params.id);
