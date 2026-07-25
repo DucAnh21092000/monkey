@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { baseUrl } from "../homepage/const";
 
-const socketUrl = import.meta.env.VITE_SOCKET_URL || baseUrl || "http://localhost:3000";
+const socketUrl = (import.meta.env.VITE_SOCKET_URL || baseUrl || "http://localhost:3000").replace(
+  /\/$/,
+  "",
+);
 
 const getInitialName = () => {
   if (typeof window === "undefined") return "User";
@@ -28,9 +31,13 @@ export default function ChatPage() {
 
   useEffect(() => {
     const socket = io(socketUrl, {
-      transports: ["websocket"],
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 10000,
+      forceNew: true,
     });
 
     socketRef.current = socket;
@@ -39,8 +46,9 @@ export default function ChatPage() {
       console.log("Socket connected");
     });
 
-    socket.on("connect_error", () => {
-      message.error("Không thể kết nối tới server chat");
+    socket.on("connect_error", (error) => {
+      console.error("Socket connect error:", error);
+      message.error("Không thể kết nối tới server chat. Vui lòng thử lại sau.");
       setJoined(false);
     });
 

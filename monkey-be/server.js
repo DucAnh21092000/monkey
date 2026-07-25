@@ -13,8 +13,22 @@ app.use(express.json());
 app.use("/api", monkeyRoutes);
 app.use("/api/video", videoRoutes);
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const startServer = (port) => {
+  server.once("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+      const nextPort = port + 1;
+      console.warn(`Port ${port} is already in use, trying ${nextPort}...`);
+      startServer(nextPort);
+    } else {
+      throw error;
+    }
+  });
+
+  server.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+};
+
+startServer(PORT);
