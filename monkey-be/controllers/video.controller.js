@@ -169,6 +169,84 @@ const download = async (req, res) => {
   })();
 };
 
+const rotate = async (req, res) => {
+  const { url, degrees } = req.body;
+
+  const jobId = randomUUID();
+
+  progressService.set(jobId, {
+    status: "waiting",
+    progress: 0,
+    fileName: "",
+    filePath: "",
+    originalFile: "",
+  });
+
+  res.json({ success: true, jobId });
+
+  (async () => {
+    try {
+      progressService.update(jobId, { status: "processing", progress: 10 });
+
+      const tempDir = path.join(__dirname, "../temp");
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+      const outPath = path.join(tempDir, `${jobId}_rotated.mp4`);
+
+      // Build ffmpeg args: read from URL and rotate by degrees
+      const angleExpr = `${degrees}*PI/180`;
+
+      const args = [
+        "-y",
+        "-i",
+        url,
+        "-vf",
+        `rotate=${angleExpr}:fillcolor=black`,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "18",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        outPath,
+      ];
+
+      const ffmpeg = spawn("ffmpeg", args);
+
+      let stderr = "";
+
+      ffmpeg.stderr.on("data", (d) => {
+        stderr += d.toString();
+      });
+
+      ffmpeg.on("close", (code) => {
+        if (code !== 0) {
+          progressService.update(jobId, { status: "error", error: stderr });
+          return;
+        }
+
+        progressService.update(jobId, {
+          status: "done",
+          progress: 100,
+          fileName: path.basename(outPath),
+          filePath: outPath,
+          originalFile: url,
+        });
+      });
+
+      ffmpeg.on("error", (err) => {
+        progressService.update(jobId, { status: "error", error: err.message });
+      });
+    } catch (err) {
+      progressService.update(jobId, { status: "error", error: err.message });
+    }
+  })();
+};
+
 const progressService = require("../services/progress.service");
 
 const progressFun = (req, res) => {
@@ -218,8 +296,29 @@ const downloadFile = (req, res) => {
   });
 };
 
+const downloadRotateFile = (req, res) => {
+  const job = progressService.get(req.params.id);
+
+  if (!job) return res.sendStatus(404);
+
+  if (job.status !== "done") {
+    return res.status(400).json({ success: false, message: "File not ready" });
+  }
+
+  res.download(job.filePath, job.fileName, (err) => {
+    if (err) console.error(err);
+
+    fs.unlink(job.filePath, () => {});
+    // originalFile is a URL for rotate jobs; do not unlink
+
+    progressService.delete(req.params.id);
+  });
+};
+
 module.exports = {
   download,
+  rotate,
   progress: progressFun,
   downloadFile,
+  downloadRotateFile,
 };
