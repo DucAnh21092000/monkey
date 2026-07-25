@@ -1,24 +1,31 @@
-import { DesktopOutlined, PieChartOutlined } from "@ant-design/icons";
+import { DesktopOutlined, MessageOutlined, PieChartOutlined } from "@ant-design/icons";
 import { Col, Menu, Row } from "antd";
-import { Link, Outlet } from "react-router";
-const menuItems = [
-  { key: "1", icon: <PieChartOutlined />, label: <Link to="/">Student Evaluation</Link> },
-  { key: "2", icon: <DesktopOutlined />, label: <Link to="/edit-video">Edit Video</Link> },
-];
+import { Link, Outlet, useLocation } from "react-router";
 
 const DefaultLayout = () => {
+  const location = useLocation();
+
+  const menuItems = [
+    { key: "1", icon: <PieChartOutlined />, label: <Link to="/">Student Evaluation</Link> },
+    { key: "2", icon: <DesktopOutlined />, label: <Link to="/download-video">Download Video</Link> },
+    { key: "3", icon: <MessageOutlined />, label: <Link to="/chat">Chat</Link> },
+  ];
+
+  const selectedKey =
+    location.pathname === "/download-video" ? "2" : location.pathname === "/chat" ? "3" : "1";
+
   return (
     <Row className="d-flex flex-row">
-      <Col span={4} className="h-screen bg-gray-100">
+      <Col className="h-screen bg-gray-100">
         <Menu
-          defaultSelectedKeys={["1"]}
+          selectedKeys={[selectedKey]}
           defaultOpenKeys={["sub1"]}
-          mode="inline"
           items={menuItems}
-          className="position-fixed  h-100 overflow-y-auto "
+          mode="horizontal"
+          className="w-100"
         />
       </Col>
-      <Col span={20} className="p-4">
+      <Col className="p-4">
         <Outlet />
       </Col>
     </Row>
