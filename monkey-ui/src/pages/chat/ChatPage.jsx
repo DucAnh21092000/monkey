@@ -1,12 +1,15 @@
 import { Button, Card, Input, List, Space, Tag, Typography, message } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import { baseUrl } from "../homepage/const";
 
-const socketUrl = import.meta.env.VITE_SOCKET_URL || "http://localhost:3000";
+const socketUrl = import.meta.env.VITE_SOCKET_URL || baseUrl || "http://localhost:3000";
 
 const getInitialName = () => {
   if (typeof window === "undefined") return "User";
-  return localStorage.getItem("monkey-chat-username") || `User-${Math.floor(Math.random() * 900 + 100)}`;
+  return (
+    localStorage.getItem("monkey-chat-username") || `User-${Math.floor(Math.random() * 900 + 100)}`
+  );
 };
 
 const getInitialRoom = () => {
@@ -98,8 +101,7 @@ export default function ChatPage() {
     <Card
       title="Chat real-time"
       extra={<Tag color="green">Phòng: {room}</Tag>}
-      style={{ maxWidth: 900, margin: "0 auto" }}
-    >
+      style={{ maxWidth: 900, margin: "0 auto" }}>
       <Space direction="vertical" style={{ width: "100%" }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Input
@@ -132,8 +134,7 @@ export default function ChatPage() {
             borderRadius: 12,
             padding: 12,
             background: "#fafafa",
-          }}
-        >
+          }}>
           <List
             dataSource={messages}
             locale={{ emptyText: "Chưa có tin nhắn nào" }}

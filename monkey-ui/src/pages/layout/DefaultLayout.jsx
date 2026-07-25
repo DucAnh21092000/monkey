@@ -7,7 +7,11 @@ const DefaultLayout = () => {
 
   const menuItems = [
     { key: "1", icon: <PieChartOutlined />, label: <Link to="/">Student Evaluation</Link> },
-    { key: "2", icon: <DesktopOutlined />, label: <Link to="/download-video">Download Video</Link> },
+    {
+      key: "2",
+      icon: <DesktopOutlined />,
+      label: <Link to="/download-video">Download Video</Link>,
+    },
     { key: "3", icon: <MessageOutlined />, label: <Link to="/chat">Chat</Link> },
   ];
 
